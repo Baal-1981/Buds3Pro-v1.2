@@ -1,0 +1,53 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.companyname.buds3proaidia"
+    android:installLocation="auto">
+
+	<!-- Cibles (conforme à ton projet) -->
+	<uses-sdk
+        android:minSdkVersion="28"
+        android:targetSdkVersion="33" />
+
+	<!-- Audio -->
+	<uses-permission android:name="android.permission.RECORD_AUDIO" />
+	<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+	<!-- Bluetooth :
+         - Pré-Android 12 (API <= 30) : anciennes permissions avec maxSdkVersion=30
+         - Android 12+ (API 31+) : BLUETOOTH_CONNECT
+         Si tu fais du SCAN d'appareils, ajoute BLUETOOTH_SCAN (voir plus bas). -->
+	<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+	<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+	<uses-permission
+        android:name="android.permission.BLUETOOTH_CONNECT"
+        android:usesPermissionFlags="neverForLocation" />
+
+	<!-- (Optionnel) Si tu scannes des appareils Bluetooth sur Android 12+ :
+         Décommente la permission ci-dessous. Pour Android <= 11, le scan requiert
+         aussi ACCESS_FINE_LOCATION (souvent nécessaire). Laisse commenté si tu ne scannes pas. -->
+	<!--
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+    -->
+
+	<!-- (Optionnel) Service au 1er plan si tu fais de l’audio continu en arrière-plan -->
+	<!--
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    -->
+
+	<!-- Capacités matérielles -->
+	<uses-feature android:name="android.hardware.microphone" android:required="true" />
+	<uses-feature android:name="android.hardware.audio.low_latency" android:required="false" />
+
+	<application
+        android:label="Buds3Pro Aide Auditive IA"
+        android:allowBackup="true"
+        android:usesCleartextTraffic="true">
+		<!-- Pas d’<activity> ici : elle est générée par l’attribut [Activity(..., MainLauncher=true, Exported=true)]
+             dans MainActivity.cs (requis depuis targetSdk 31+). -->
+	</application>
+</manifest>

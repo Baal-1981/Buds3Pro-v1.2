@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:orientation="vertical" android:padding="16dp"
+  android:layout_width="match_parent" android:layout_height="match_parent">
+
+	<Button android:id="@+id/btnStart" android:text="Démarrer aide auditive"
+	  android:layout_width="match_parent" android:layout_height="wrap_content"/>
+	<Button android:id="@+id/btnStop" android:text="Arrêter"
+	  android:layout_width="match_parent" android:layout_height="wrap_content"
+	  android:enabled="false" android:layout_marginTop="8dp"/>
+
+	<Switch android:id="@+id/swHighpass" android:text="Coupe-bas (100 Hz)"
+	  android:checked="true" android:layout_width="match_parent" android:layout_height="wrap_content"
+	  android:layout_marginTop="16dp"/>
+	<Switch android:id="@+id/swAndroidNS" android:text="Réduction bruit Android (NS)"
+	  android:checked="true" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+	<Switch android:id="@+id/swAndroidAGC" android:text="AGC Android"
+	  android:checked="true" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+	<Switch android:id="@+id/swAndroidAEC" android:text="Anti-écho Android (AEC)"
+	  android:checked="true" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+	<Switch
+	  android:id="@+id/swApmEnable"
+	  android:text="WebRTC APM (activer)"
+	  android:checked="true"
+	  android:layout_width="match_parent"
+	  android:layout_height="wrap_content"
+	  android:layout_marginTop="16dp"/>
+	
+	<Switch
+	  android:id="@+id/swApmNS"
+	  android:text="APM – Réduction de bruit (NS)"
+	  android:checked="true"
+	  android:layout_width="match_parent"
+	  android:layout_height="wrap_content"/>
+
+	<Switch
+	  android:id="@+id/swApmAGC"
+	  android:text="APM – AGC (gain auto)"
+	  android:checked="true"
+	  android:layout_width="match_parent"
+	  android:layout_height="wrap_content"/>
+
+	<Switch
+	  android:id="@+id/swApmAEC"
+	  android:text="APM – Anti-écho (AEC)"
+	  android:checked="true"
+	  android:layout_width="match_parent"
+	  android:layout_height="wrap_content"/>
+
+	<TextView android:text="Clarity boost (tilt EQ +2–3 dB à 2–4 kHz)"
+	  android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp"/>
+	<SeekBar android:id="@+id/seekClarity" android:max="10" android:progress="3"
+	  android:layout_width="match_parent" android:layout_height="wrap_content"/>
+
+	<TextView android:id="@+id/txtLatency" android:text="Latence estimée: — ms"
+	  android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"/>
+</LinearLayout>

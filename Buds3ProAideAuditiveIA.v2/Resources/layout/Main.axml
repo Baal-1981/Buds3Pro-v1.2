@@ -1,0 +1,53 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+  <ToggleButton
+      android:id="@+id/toggleEngine"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:textOn="Conversation Boost : ON"
+      android:textOff="Conversation Boost : OFF" />
+
+  <SeekBar
+      android:id="@+id/seekBoost"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:max="12"
+      android:progress="4" />
+
+  <TextView
+      android:id="@+id/txtBoost"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Boost voix (dB): 4" />
+
+  <SeekBar
+      android:id="@+id/seekNR"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:max="10"
+      android:progress="6" />
+
+  <TextView
+      android:id="@+id/txtNR"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Réduction de bruit: 6/10" />
+
+  <Button
+      android:id="@+id/btnCalib"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="Calibration rapide (niveau ambiant)" />
+
+  <TextView
+      android:id="@+id/txtInfo"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:text="Prêt. Connecte les Buds 3 Pro avant d'activer." />
+
+</LinearLayout>

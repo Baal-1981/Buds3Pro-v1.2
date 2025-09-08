@@ -1,0 +1,27 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36414.22 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Buds3ProAideAuditiveIA.v2", "Buds3ProAideAuditiveIA.v2\Buds3ProAideAuditiveIA.v2.csproj", "{97519F7F-A48D-492D-B1DC-AD411BABCBEF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{97519F7F-A48D-492D-B1DC-AD411BABCBEF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{97519F7F-A48D-492D-B1DC-AD411BABCBEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{97519F7F-A48D-492D-B1DC-AD411BABCBEF}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{97519F7F-A48D-492D-B1DC-AD411BABCBEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{97519F7F-A48D-492D-B1DC-AD411BABCBEF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{97519F7F-A48D-492D-B1DC-AD411BABCBEF}.Release|Any CPU.Deploy.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {43948C0A-93EA-4A27-B708-2B0A0322E735}
+	EndGlobalSection
+EndGlobal

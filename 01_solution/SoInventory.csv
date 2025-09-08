@@ -1,0 +1,5 @@
+﻿"ProjectName","ABI","LibName","SizeKB","SHA256","RelPath","IsWebRTC"
+"Buds3ProAideAuditiveIA.v2","arm64-v8a","libxamarin-app.so","2691","54203AF5404363AE23A632833C674C3EC3D81ED86652C1EC154813DD13EE6A5C","obj\Debug\130\app_shared_libraries\arm64-v8a\libxamarin-app.so","False"
+"Buds3ProAideAuditiveIA.v2","armeabi-v7a","libxamarin-app.so","1881","58B52F6ABB420B43FF7D503FAB282405039D84370BEFB541928D57E8D2C3CFC4","obj\Debug\130\app_shared_libraries\armeabi-v7a\libxamarin-app.so","False"
+"Buds3ProAideAuditiveIA.v2","x86","libxamarin-app.so","1881","D9530273D5CC1A01D15CF5906DDFBBB3C203ACE2463FF7C435F40154348CA117","obj\Debug\130\app_shared_libraries\x86\libxamarin-app.so","False"
+"Buds3ProAideAuditiveIA.v2","x86_64","libxamarin-app.so","2809","AED6E36AFDEDCEF47E5140771DAF8BBEA50B138959DAB5C14EDE35E89A770182","obj\Debug\130\app_shared_libraries\x86_64\libxamarin-app.so","False"

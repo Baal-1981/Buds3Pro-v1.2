@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+.idea/
+.gradle/
+*.user
+*.suo
+*.keystore
+local.properties
+**/Release/
+**/Debug/

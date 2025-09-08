@@ -1,0 +1,27 @@
+﻿**********************
+Début de la transcription Windows PowerShell
+Heure de début : 20250906151519
+Nom d'utilisateur : AsusPC\Math
+Utilisateur runAs :  AsusPC\Math
+Nom de la configuration : 
+Ordinateur : ASUSPC (Microsoft Windows NT 10.0.26100.0)
+Application hôte : C:\Windows\system32\WindowsPowerShell\v1.0\PowerShell_ISE.exe
+ID de processus : 24452
+PSVersion: 5.1.26100.5074
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.5074
+BuildVersion: 10.0.26100.5074
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+[INFO] Solution: C:\Users\Math\source\repos\Buds3ProAideAuditiveIA.v2\Buds3ProAideAuditiveIA.v2.sln
+[INFO] Racine : C:\Users\Math\source\repos\Buds3ProAideAuditiveIA.v2
+[INFO] Sortie : C:\Users\Math\source\repos\Buds3ProAideAuditiveIA.v2\01_solution
+[INFO] CSV    : C:\Users\Math\source\repos\Buds3ProAideAuditiveIA.v2\01_solution\ProjectsInventory.csv
+[INFO] Projets détectés dans la solution : 1
+**********************
+Fin de la transcription Windows PowerShell
+Heure de fin : 20250906151520
+**********************
