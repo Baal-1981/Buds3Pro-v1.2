@@ -6,7 +6,7 @@ using Android.Runtime;
 using Android.Views;
 using Android.Widget;
 using System;
-using System.Threading.Tasks;
+using System.Timers;
 
 namespace Buds3ProAideAuditivelA.v2
 {
@@ -15,122 +15,413 @@ namespace Buds3ProAideAuditivelA.v2
     public class MainActivity : Activity, ILogSink
     {
         private const int ReqAudio = 0xB301;
-        private const string TAG = "Buds3ProUI";
 
         private AudioEngine _engine;
+        private LatencyMeter _latMeter;
 
-        // UI
-        private Button _btnStart;
-        private Button _btnStop;
-        private Switch _swPass, _swGate, _swDucker, _swHp, _swClarity;
-        private Spinner _spRate, _spFrame;
-        private TextView _status;
+        // --- UI principal ---
+        private Button _btnStart, _btnStop, _btnCalib;
+        private Switch _swPass, _swNCEnable, _swShowLogs;
+        private SeekBar _sbGain;
+        private TextView _lblGain, _status, _latency;
+
+        // --- Noise Cancelling ---
+        private LinearLayout _ncPanel;
+        private Button _btnNcDrop;
+        private Switch _swExpander, _swHp, _swClarity, _swPlatformFx, _swDspNs, _swVad;
+        private SeekBar _sbAmbCut, _sbAmbRelease;
+        private TextView _lblAmb, _lblAmbRelease;
+        private Spinner _spRate, _spFrame, _spHpCut;
+
+        // --- Égalisation existante ---
+        private Switch _swEqEnable;
+        private Button _btnEqDrop;
+        private LinearLayout _eqPanel;
+        private TextView _lblBass, _lblTreble;
+        private SeekBar _sbBass, _sbTreble;
+        private Spinner _spBassFreq, _spTrebleFreq;
+
+        // --- Nouveaux contrôles Qualité ---
+        private Button _btnQualDrop;
+        private LinearLayout _qualPanel;
+
+        private Switch _swPresence;
+        private TextView _lblPresence, _lblPresenceHz;
+        private SeekBar _sbPresence; // −8..+8 dB (offset 8)
+        private Spinner _spPresenceHz; // 1–3 kHz
+
+        private Switch _swHum;
+        private Spinner _spHumBase; // 50/60
+
+        private Switch _swDeEsser;
+        private TextView _lblDeEsser;
+        private SeekBar _sbDeEsser; // 0..8 dB (max attén)
+
+        // Headroom meter
+        private TextView _lblHeadroom;
 
         protected override void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
 
-            // UI simple programmatique
-            LinearLayout root = new LinearLayout(this);
-            root.Orientation = Orientation.Vertical;
+            var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
             root.SetPadding(24, 24, 24, 24);
 
-            _btnStart = new Button(this);
-            _btnStart.Text = "START";
-            _btnStop = new Button(this);
-            _btnStop.Text = "STOP";
+            // --- Principal ---
+            _btnStart = new Button(this) { Text = "START" };
+            _btnStop = new Button(this) { Text = "STOP" };
 
-            _swPass = new Switch(this);
-            _swPass.Text = "Pass-through";
-            _swPass.Checked = true;
+            _swPass = new Switch(this) { Text = "Pass-through (ON = audio actif)", Checked = true };
 
-            _swGate = new Switch(this);
-            _swGate.Text = "Gate";
+            _lblGain = new TextView(this) { Text = "Gain: +19 dB" };
+            _sbGain = new SeekBar(this) { Max = 36, Progress = 19 };
 
-            _swDucker = new Switch(this);
-            _swDucker.Text = "Ducker";
+            // NC
+            _swNCEnable = new Switch(this) { Text = "Activer Noise Cancelling", Checked = true };
+            _btnNcDrop = new Button(this) { Text = "Noise Cancelling ▼" };
+            _btnCalib = new Button(this) { Text = "Calibrer le bruit (0.5 s)" };
 
-            _swHp = new Switch(this);
-            _swHp.Text = "High-pass";
+            // Latence + Logs
+            _latency = new TextView(this) { Text = "Latence: -- ms", TextSize = 12f };
+            _swShowLogs = new Switch(this) { Text = "Afficher les logs", Checked = true };
+            _status = new TextView(this) { Text = "Prêt.", TextSize = 12f };
 
-            _swClarity = new Switch(this);
-            _swClarity.Text = "Clarity";
+            // --- Panneau NC ---
+            _ncPanel = new LinearLayout(this) { Orientation = Orientation.Vertical, Visibility = ViewStates.Visible };
+            _swExpander = new Switch(this) { Text = "Silence intelligent (expander)", Checked = true };
+            _lblAmb = new TextView(this) { Text = "Silence atténuation: -12 dB" };
+            _sbAmbCut = new SeekBar(this) { Max = 24, Progress = 12 };
+
+            _lblAmbRelease = new TextView(this) { Text = "Relâche expander: 150 ms" };
+            _sbAmbRelease = new SeekBar(this) { Max = 300, Progress = 150 }; // 50..300 (on borne en code)
+
+            _swHp = new Switch(this) { Text = "High-pass", Checked = false };
+            _spHpCut = new Spinner(this);
+
+            _swClarity = new Switch(this) { Text = "Clarity", Checked = true };
+            _swPlatformFx = new Switch(this) { Text = "Android NS/AGC/AEC", Checked = false };
+            _swDspNs = new Switch(this) { Text = "Spectral NS (FFT)", Checked = false };
+            _swVad = new Switch(this) { Text = "VAD (voix seulement)", Checked = true };
 
             _spRate = new Spinner(this);
             _spFrame = new Spinner(this);
 
-            _status = new TextView(this);
-            _status.Text = "Prêt.";
-            _status.TextSize = 12f;
+            // --- EQ existante ---
+            _swEqEnable = new Switch(this) { Text = "Activer Égalisation", Checked = false };
+            _btnEqDrop = new Button(this) { Text = "Égalisation ▼" };
+            _eqPanel = new LinearLayout(this) { Orientation = Orientation.Vertical, Visibility = ViewStates.Gone };
+            _lblBass = new TextView(this) { Text = "Basses: 0 dB" };
+            _sbBass = new SeekBar(this) { Max = 24, Progress = 12 };
+            _spBassFreq = new Spinner(this);
+            _lblTreble = new TextView(this) { Text = "Aigus: 0 dB" };
+            _sbTreble = new SeekBar(this) { Max = 24, Progress = 12 };
+            _spTrebleFreq = new Spinner(this);
 
-            ArrayAdapter<string> rateAdapter =
-                new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem,
-                    new string[] { "Auto", "48000", "44100" });
+            // --- Panneau Qualité (nouveau) ---
+            _btnQualDrop = new Button(this) { Text = "Qualité voix ▼" };
+            _qualPanel = new LinearLayout(this) { Orientation = Orientation.Vertical, Visibility = ViewStates.Gone };
+
+            _swPresence = new Switch(this) { Text = "Présence voix (1–3 kHz)", Checked = true };
+            _lblPresence = new TextView(this) { Text = "Présence: 0 dB" };
+            _sbPresence = new SeekBar(this) { Max = 16, Progress = 8 }; // −8..+8 (offset 8)
+            _lblPresenceHz = new TextView(this) { Text = "Fréquence présence: 2.0 kHz" };
+            _spPresenceHz = new Spinner(this);
+
+            _swHum = new Switch(this) { Text = "Hum remover (secteur)", Checked = false };
+            _spHumBase = new Spinner(this);
+
+            _swDeEsser = new Switch(this) { Text = "De-esser (sifflantes)", Checked = false };
+            _lblDeEsser = new TextView(this) { Text = "Force de-esser: 0 dB (max)" };
+            _sbDeEsser = new SeekBar(this) { Max = 8, Progress = 0 };
+
+            _lblHeadroom = new TextView(this) { Text = "Headroom: ok", TextSize = 12f };
+
+            // Spinners
+            var rateAdapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem,
+                new string[] { "Auto", "48000", "44100" });
             rateAdapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
-            _spRate.Adapter = rateAdapter;
-            _spRate.SetSelection(0);
+            _spRate.Adapter = rateAdapter; _spRate.SetSelection(0);
 
-            ArrayAdapter<string> frameAdapter =
-                new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem,
-                    new string[] { "2 ms", "5 ms", "10 ms" });
+            var frameAdapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem,
+                new string[] { "2 ms", "5 ms", "10 ms" });
             frameAdapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
-            _spFrame.Adapter = frameAdapter;
-            _spFrame.SetSelection(2); // 10 ms
+            _spFrame.Adapter = frameAdapter; _spFrame.SetSelection(2);
 
-            // Compose UI
+            var hpAdapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem,
+                new string[] { "80 Hz", "100 Hz", "120 Hz", "160 Hz", "200 Hz" });
+            hpAdapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
+            _spHpCut.Adapter = hpAdapter; _spHpCut.SetSelection(2);
+
+            var bassFreqAdapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem,
+                new string[] { "60 Hz", "80 Hz", "100 Hz", "120 Hz", "160 Hz", "200 Hz", "250 Hz", "300 Hz" });
+            bassFreqAdapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
+            _spBassFreq.Adapter = bassFreqAdapter; _spBassFreq.SetSelection(3);
+
+            var trebleFreqAdapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem,
+                new string[] { "3 kHz", "4 kHz", "6 kHz", "8 kHz" });
+            trebleFreqAdapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
+            _spTrebleFreq.Adapter = trebleFreqAdapter; _spTrebleFreq.SetSelection(1);
+
+            var presenceHzAdapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem,
+                new string[] { "1.0 kHz", "1.5 kHz", "2.0 kHz", "2.5 kHz", "3.0 kHz" });
+            presenceHzAdapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
+            _spPresenceHz.Adapter = presenceHzAdapter; _spPresenceHz.SetSelection(2);
+
+            var humBaseAdapter = new ArrayAdapter<string>(this, Android.Resource.Layout.SimpleSpinnerItem,
+                new string[] { "50 Hz", "60 Hz" });
+            humBaseAdapter.SetDropDownViewResource(Android.Resource.Layout.SimpleSpinnerDropDownItem);
+            _spHumBase.Adapter = humBaseAdapter; _spHumBase.SetSelection(1);
+
+            // Panneau NC
+            _ncPanel.AddView(_swExpander);
+            _ncPanel.AddView(_lblAmb);
+            _ncPanel.AddView(_sbAmbCut);
+            _ncPanel.AddView(_lblAmbRelease);
+            _ncPanel.AddView(_sbAmbRelease);
+            _ncPanel.AddView(_swHp);
+            _ncPanel.AddView(_spHpCut);
+            _ncPanel.AddView(_swClarity);
+            _ncPanel.AddView(_swPlatformFx);
+            _ncPanel.AddView(_swDspNs);
+            _ncPanel.AddView(_swVad);
+
+            var lblRate = new TextView(this) { Text = "Sample Rate (au redémarrage)" };
+            var lblFrame = new TextView(this) { Text = "Frame Size (au redémarrage)" };
+            _ncPanel.AddView(lblRate); _ncPanel.AddView(_spRate);
+            _ncPanel.AddView(lblFrame); _ncPanel.AddView(_spFrame);
+
+            // Panneau EQ
+            _eqPanel.AddView(_lblBass); _eqPanel.AddView(_sbBass); _eqPanel.AddView(_spBassFreq);
+            _eqPanel.AddView(_lblTreble); _eqPanel.AddView(_sbTreble); _eqPanel.AddView(_spTrebleFreq);
+
+            // Panneau Qualité
+            _qualPanel.AddView(_swPresence);
+            _qualPanel.AddView(_lblPresence);
+            _qualPanel.AddView(_sbPresence);
+            _qualPanel.AddView(_lblPresenceHz);
+            _qualPanel.AddView(_spPresenceHz);
+
+            _qualPanel.AddView(_swHum);
+            _qualPanel.AddView(_spHumBase);
+
+            _qualPanel.AddView(_swDeEsser);
+            _qualPanel.AddView(_lblDeEsser);
+            _qualPanel.AddView(_sbDeEsser);
+
+            // Layout racine
             root.AddView(_btnStart);
             root.AddView(_btnStop);
+
             root.AddView(_swPass);
-            root.AddView(_swGate);
-            root.AddView(_swDucker);
-            root.AddView(_swHp);
-            root.AddView(_swClarity);
+            root.AddView(_lblGain); root.AddView(_sbGain);
 
-            TextView rateLbl = new TextView(this);
-            rateLbl.Text = "Sample Rate";
-            root.AddView(rateLbl);
-            root.AddView(_spRate);
+            root.AddView(_swNCEnable);
+            root.AddView(_btnNcDrop);
+            root.AddView(_ncPanel);
+            root.AddView(_btnCalib);
 
-            TextView frameLbl = new TextView(this);
-            frameLbl.Text = "Frame Size";
-            root.AddView(frameLbl);
-            root.AddView(_spFrame);
+            root.AddView(_swEqEnable);
+            root.AddView(_btnEqDrop);
+            root.AddView(_eqPanel);
 
-            TextView logLbl = new TextView(this);
-            logLbl.Text = "Logs";
-            root.AddView(logLbl);
+            root.AddView(_btnQualDrop);
+            root.AddView(_qualPanel);
+
+            root.AddView(_lblHeadroom);
+            root.AddView(_latency);
+
+            root.AddView(_swShowLogs);
             root.AddView(_status);
 
             SetContentView(root);
 
             _engine = new AudioEngine(this);
+            _engine.SetMetersCallback((pkDb, rmsDb, grDb) =>
+            {
+                RunOnUiThread(() =>
+                {
+                    var head = (0 - pkDb);
+                    _lblHeadroom.Text = $"Headroom: {head:0.0} dB | Peak {pkDb:0.0} dBFS | RMS {rmsDb:0.0} dBFS | GR {grDb:0.0} dB";
+                });
+            });
 
-            _btnStart.Click += async (s, e) => await StartEngineAsync();
-            _btnStop.Click += async (s, e) => await StopEngineAsync();
+            _latMeter = new LatencyMeter(_engine, ms => RunOnUiThread(() => _latency.Text = $"Latence: {ms} ms"));
+
+            // Boutons
+            _btnStart.Click += (s, e) => StartEngine();
+            _btnStop.Click += (s, e) => StopEngine();
+
+            _btnNcDrop.Click += (s, e) =>
+            {
+                bool show = _ncPanel.Visibility != ViewStates.Visible;
+                _ncPanel.Visibility = show ? ViewStates.Visible : ViewStates.Gone;
+                _btnNcDrop.Text = show ? "Noise Cancelling ▲" : "Noise Cancelling ▼";
+            };
+
+            _btnEqDrop.Click += (s, e) =>
+            {
+                bool show = _eqPanel.Visibility != ViewStates.Visible;
+                _eqPanel.Visibility = show ? ViewStates.Visible : ViewStates.Gone;
+                _btnEqDrop.Text = show ? "Égalisation ▲" : "Égalisation ▼";
+            };
+
+            _btnQualDrop.Click += (s, e) =>
+            {
+                bool show = _qualPanel.Visibility != ViewStates.Visible;
+                _qualPanel.Visibility = show ? ViewStates.Visible : ViewStates.Gone;
+                _btnQualDrop.Text = show ? "Qualité voix ▲" : "Qualité voix ▼";
+            };
+
+            _btnCalib.Click += (s, e) =>
+            {
+                if (_swNCEnable.Checked)
+                {
+                    _engine.CalibrateNoiseNow(500);
+                    Toast.MakeText(this, "Restez silencieux 0.5 s", ToastLength.Short).Show();
+                }
+            };
+
+            // Toggles runtime
+            _swPass.CheckedChange += (s, e) => _engine.SetFlags(pass: e.IsChecked);
+            _swNCEnable.CheckedChange += (s, e) => SetNcEnabled(e.IsChecked);
+
+            _swExpander.CheckedChange += (s, e) => _engine.SetFlags(ambientExpander: e.IsChecked, gate: e.IsChecked);
+            _sbAmbCut.ProgressChanged += (s, e) => { _engine.SetAmbientReductionDb(e.Progress); _lblAmb.Text = $"Silence atténuation: -{e.Progress} dB"; };
+            _sbAmbRelease.ProgressChanged += (s, e) =>
+            {
+                int ms = Math.Max(50, e.Progress);
+                _engine.SetAmbientReleaseMs(ms);
+                _lblAmbRelease.Text = $"Relâche expander: {ms} ms";
+            };
+
+            _swHp.CheckedChange += (s, e) => _engine.SetFlags(hp: e.IsChecked);
+            _spHpCut.ItemSelected += (s, e) =>
+            {
+                int hz = e.Position switch { 0 => 80, 1 => 100, 2 => 120, 3 => 160, _ => 200 };
+                _engine.SetHighPassCutoffHz(hz);
+            };
+
+            _swClarity.CheckedChange += (s, e) => _engine.SetFlags(clarity: e.IsChecked);
+            _swPlatformFx.CheckedChange += (s, e) => _engine.SetFlags(platformFx: e.IsChecked);
+            _swDspNs.CheckedChange += (s, e) => _engine.SetFlags(dspNs: e.IsChecked);
+            _swVad.CheckedChange += (s, e) => _engine.SetFlags(vad: e.IsChecked);
+
+            _sbGain.ProgressChanged += (s, e) =>
+            {
+                _engine.SetGainDb(e.Progress);
+                _lblGain.Text = $"Gain: +{e.Progress} dB";
+            };
+
+            // EQ
+            _swEqEnable.CheckedChange += (s, e) => _engine.SetEqEnabled(e.IsChecked);
+            _sbBass.ProgressChanged += (s, e) =>
+            {
+                int db = e.Progress - 12;
+                _engine.SetBassDb(db);
+                _lblBass.Text = $"Basses: {db:+#;-#;0} dB";
+            };
+            _sbTreble.ProgressChanged += (s, e) =>
+            {
+                int db = e.Progress - 12;
+                _engine.SetTrebleDb(db);
+                _lblTreble.Text = $"Aigus: {db:+#;-#;0} dB";
+            };
+            _spBassFreq.ItemSelected += (s, e) =>
+            {
+                int hz = e.Position switch { 0 => 60, 1 => 80, 2 => 100, 3 => 120, 4 => 160, 5 => 200, 6 => 250, _ => 300 };
+                _engine.SetBassFreqHz(hz);
+            };
+            _spTrebleFreq.ItemSelected += (s, e) =>
+            {
+                int hz = e.Position switch { 0 => 3000, 1 => 4000, 2 => 6000, _ => 8000 };
+                _engine.SetTrebleFreqHz(hz);
+            };
+
+            // Qualité
+            _swPresence.CheckedChange += (s, e) => _engine.SetPresenceEnabled(e.IsChecked);
+            _sbPresence.ProgressChanged += (s, e) =>
+            {
+                int db = e.Progress - 8; // −8..+8
+                _engine.SetPresenceDb(db);
+                _lblPresence.Text = $"Présence: {db:+#;-#;0} dB";
+            };
+            _spPresenceHz.ItemSelected += (s, e) =>
+            {
+                int hz = e.Position switch { 0 => 1000, 1 => 1500, 2 => 2000, 3 => 2500, _ => 3000 };
+                _engine.SetPresenceHz(hz);
+                _lblPresenceHz.Text = $"Fréquence présence: {(hz >= 1000 ? (hz / 1000.0).ToString("0.0") + " kHz" : hz + " Hz")}";
+            };
+
+            _swHum.CheckedChange += (s, e) => _engine.SetHumEnabled(e.IsChecked);
+            _spHumBase.ItemSelected += (s, e) =>
+            {
+                int hz = e.Position == 0 ? 50 : 60;
+                _engine.SetHumBaseHz(hz);
+            };
+
+            _swDeEsser.CheckedChange += (s, e) => _engine.SetDeEsserEnabled(e.IsChecked);
+            _sbDeEsser.ProgressChanged += (s, e) =>
+            {
+                _engine.SetDeEsserMaxDb(e.Progress);
+                _lblDeEsser.Text = $"Force de-esser: {e.Progress} dB (max)";
+            };
+
+            _swShowLogs.CheckedChange += (s, e) =>
+            {
+                _status.Visibility = e.IsChecked ? ViewStates.Visible : ViewStates.Gone;
+            };
 
             UpdateUiState();
         }
 
+        private void SetNcEnabled(bool enabled)
+        {
+            _ncPanel.Visibility = enabled ? ViewStates.Visible : ViewStates.Gone;
+            _btnNcDrop.Enabled = enabled;
+            _btnCalib.Visibility = enabled ? ViewStates.Visible : ViewStates.Gone;
+            _lblAmb.Visibility = enabled ? ViewStates.Visible : ViewStates.Gone;
+            _sbAmbCut.Visibility = enabled ? ViewStates.Visible : ViewStates.Gone;
+            _lblAmbRelease.Visibility = enabled ? ViewStates.Visible : ViewStates.Gone;
+            _sbAmbRelease.Visibility = enabled ? ViewStates.Visible : ViewStates.Gone;
+
+            if (!enabled)
+            {
+                _engine.SetFlags(ambientExpander: false, gate: false, hp: false,
+                                 clarity: false, platformFx: false, dspNs: false, vad: false);
+                _swExpander.Checked = false;
+                _swHp.Checked = false;
+                _swClarity.Checked = false;
+                _swPlatformFx.Checked = false;
+                _swDspNs.Checked = false;
+                _swVad.Checked = false;
+            }
+            else
+            {
+                _engine.SetFlags(ambientExpander: _swExpander.Checked, gate: _swExpander.Checked,
+                                 hp: _swHp.Checked, clarity: _swClarity.Checked,
+                                 platformFx: _swPlatformFx.Checked, dspNs: _swDspNs.Checked, vad: _swVad.Checked);
+            }
+        }
+
         public void Log(string msg)
         {
+            if (_status.Visibility != ViewStates.Visible) { try { Android.Util.Log.Debug("Buds3ProUI", msg); } catch { } return; }
             RunOnUiThread(() =>
             {
                 string t = DateTime.Now.ToString("HH:mm:ss.fff");
-                _status.Text = "[" + t + "] " + msg + "\n" + _status.Text;
+                _status.Text = $"[{t}] {msg}\n{_status.Text}";
             });
-            try { Android.Util.Log.Debug(TAG, msg); } catch { }
+            try { Android.Util.Log.Debug("Buds3ProUI", msg); } catch { }
         }
 
         protected override void OnDestroy()
         {
             base.OnDestroy();
-            if (_engine != null)
-            {
-                var _ = _engine.StopAsync();
-            }
+            StopEngine();
+            _latMeter?.Dispose();
         }
 
-        private async Task StartEngineAsync()
+        private void StartEngine()
         {
             if (CheckSelfPermission(Manifest.Permission.RecordAudio) != Permission.Granted)
             {
@@ -139,86 +430,130 @@ namespace Buds3ProAideAuditivelA.v2
             }
 
             ApplyConfigFromUi();
-            SetControlsEnabled(false);
 
-            bool ok = await _engine.StartAsync();
-            if (!ok)
+            if (_engine.Start())
             {
-                Toast.MakeText(this, "Erreur démarrage audio", ToastLength.Short).Show();
-                SetControlsEnabled(true);
+                if (_swNCEnable.Checked) Toast.MakeText(this, "Calibration auto (0.5 s)", ToastLength.Short).Show();
+                SetControlsEnabled(running: true);
+                _latMeter.Start();
+            }
+            else
+            {
+                Toast.MakeText(this, "Erreur de démarrage audio", ToastLength.Short).Show();
+                SetControlsEnabled(running: false);
             }
             UpdateUiState();
         }
 
-        private async Task StopEngineAsync()
+        private void StopEngine()
         {
-            if (_engine != null)
-            {
-                await _engine.StopAsync();
-            }
-            SetControlsEnabled(true);
+            _latMeter.Stop();
+            _engine.Stop();
+            SetControlsEnabled(running: false);
             UpdateUiState();
         }
 
         private void ApplyConfigFromUi()
         {
-            int sr = 0;
-            switch (_spRate.SelectedItemPosition)
-            {
-                case 1: sr = 48000; break;
-                case 2: sr = 44100; break;
-                default: sr = 0; break; // Auto
-            }
+            int sr = (_spRate.SelectedItemPosition == 1) ? 48000 :
+                     (_spRate.SelectedItemPosition == 2) ? 44100 : 0;
 
-            int frameMs = 10;
-            switch (_spFrame.SelectedItemPosition)
-            {
-                case 0: frameMs = 2; break;
-                case 1: frameMs = 5; break;
-                default: frameMs = 10; break;
-            }
+            int frameMs = (_spFrame.SelectedItemPosition == 0) ? 2 :
+                          (_spFrame.SelectedItemPosition == 1) ? 5 : 10;
 
             _engine.Configure(sr, frameMs,
                 pass: _swPass.Checked,
-                gate: _swGate.Checked,
-                ducker: _swDucker.Checked,
+                gateIgnored: _swExpander.Checked,
+                duckerIgnored: false,
                 hp: _swHp.Checked,
                 clarity: _swClarity.Checked);
+
+            // NC global
+            SetNcEnabled(_swNCEnable.Checked);
+
+            // ÉQ global
+            _engine.SetEqEnabled(_swEqEnable.Checked);
+            _engine.SetBassDb(_sbBass.Progress - 12);
+            _engine.SetTrebleDb(_sbTreble.Progress - 12);
+            int bassHz = _spBassFreq.SelectedItemPosition switch { 0 => 60, 1 => 80, 2 => 100, 3 => 120, 4 => 160, 5 => 200, 6 => 250, _ => 300 };
+            int trebHz = _spTrebleFreq.SelectedItemPosition switch { 0 => 3000, 1 => 4000, 2 => 6000, _ => 8000 };
+            _engine.SetBassFreqHz(bassHz);
+            _engine.SetTrebleFreqHz(trebHz);
+
+            // Qualité
+            _engine.SetPresenceEnabled(_swPresence.Checked);
+            _engine.SetPresenceDb(_sbPresence.Progress - 8);
+            int presHz = _spPresenceHz.SelectedItemPosition switch { 0 => 1000, 1 => 1500, 2 => 2000, 3 => 2500, _ => 3000 };
+            _engine.SetPresenceHz(presHz);
+
+            _engine.SetHumEnabled(_swHum.Checked);
+            _engine.SetHumBaseHz(_spHumBase.SelectedItemPosition == 0 ? 50 : 60);
+
+            _engine.SetDeEsserEnabled(_swDeEsser.Checked);
+            _engine.SetDeEsserMaxDb(_sbDeEsser.Progress);
+
+            _engine.SetGainDb(_sbGain.Progress);
+            _engine.SetAmbientReductionDb(_sbAmbCut.Progress);
+            _engine.SetAmbientReleaseMs(Math.Max(50, _sbAmbRelease.Progress));
+            int hpHz = _spHpCut.SelectedItemPosition switch { 0 => 80, 1 => 100, 2 => 120, 3 => 160, _ => 200 };
+            _engine.SetHighPassCutoffHz(hpHz);
         }
 
-        private void SetControlsEnabled(bool enabled)
+        private void SetControlsEnabled(bool running)
         {
-            bool running = (_engine != null && _engine.IsRunning);
-            _btnStart.Enabled = enabled && !running;
-            _btnStop.Enabled = !enabled && running;
-
-            _swPass.Enabled = enabled;
-            _swGate.Enabled = enabled;
-            _swDucker.Enabled = enabled;
-            _swHp.Enabled = enabled;
-            _swClarity.Enabled = enabled;
-            _spRate.Enabled = enabled;
-            _spFrame.Enabled = enabled;
-        }
-
-        private void UpdateUiState()
-        {
-            bool running = (_engine != null && _engine.IsRunning);
             _btnStart.Enabled = !running;
             _btnStop.Enabled = running;
+            _btnCalib.Enabled = running && _swNCEnable.Checked;
+
+            _swPass.Enabled = true;
+            _sbGain.Enabled = true;
+
+            _swNCEnable.Enabled = true;
+            _btnNcDrop.Enabled = _swNCEnable.Checked;
+
+            _swEqEnable.Enabled = true;
+            _btnEqDrop.Enabled = true;
+
+            _btnQualDrop.Enabled = true;
+
+            _spRate.Enabled = !running;
+            _spFrame.Enabled = !running;
         }
+
+        private void UpdateUiState() => SetControlsEnabled(_engine?.IsRunning == true);
 
         public override void OnRequestPermissionsResult(int requestCode, string[] permissions, [GeneratedEnum] Permission[] grantResults)
         {
             base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
             if (requestCode == ReqAudio && grantResults.Length > 0 && grantResults[0] == Permission.Granted)
             {
-                var _ = StartEngineAsync();
+                StartEngine();
             }
             else
             {
                 Toast.MakeText(this, "Permission micro requise", ToastLength.Short).Show();
             }
+        }
+
+        // --- LatencyMeter helper (minimal) ---
+        private sealed class LatencyMeter : IDisposable
+        {
+            private readonly AudioEngine _eng;
+            private readonly Action<int> _cb;
+            private readonly Timer _timer;
+
+            public LatencyMeter(AudioEngine eng, Action<int> onLatencyMs)
+            {
+                _eng = eng;
+                _cb = onLatencyMs ?? (_ => { });
+                _timer = new Timer(500);
+                _timer.Elapsed += (s, e) => { try { _cb(_eng.EstimatedLatencyMs); } catch { } };
+                _timer.AutoReset = true;
+            }
+
+            public void Start() { _timer.Start(); }
+            public void Stop() { _timer.Stop(); }
+            public void Dispose() { _timer.Dispose(); }
         }
     }
 }
