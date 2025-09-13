@@ -3,7 +3,7 @@ using Android.Content.Res;
 using Android.OS;
 using Java.Util;
 
-namespace Buds3ProAideAuditivelA.v2
+namespace Buds3ProAideAuditivelA.v2.Helpers
 {
     public static class LocaleManager
     {
