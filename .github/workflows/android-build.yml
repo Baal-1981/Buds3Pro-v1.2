@@ -1,0 +1,37 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup Java (JDK 11)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'microsoft'
+          java-version: '11'
+
+      # Android SDK (plateforme 35 + build-tools)
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platforms;android-35
+            build-tools;35.0.0
+
+      # Build Release (Xamarin.Android)
+      - name: Build
+        shell: pwsh
+        run: |
+          msbuild .\Buds3ProAideAuditiveIA.v2.sln /restore /t:Rebuild /p:Configuration=Release
