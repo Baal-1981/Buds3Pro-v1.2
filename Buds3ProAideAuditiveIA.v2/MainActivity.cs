@@ -6,7 +6,6 @@ using Android.Runtime;
 using Android.Views;
 using Android.Widget;
 using System;
-using System.Timers;
 
 namespace Buds3ProAideAuditivelA.v2
 {
@@ -25,6 +24,9 @@ namespace Buds3ProAideAuditivelA.v2
         private SeekBar _sbGain;
         private TextView _lblGain, _status, _latency;
 
+
+        private RealtimeChartView _chart;
+        private LatencyStats _latStats;
         // --- Noise Cancelling ---
         private LinearLayout _ncPanel;
         private Button _btnNcDrop;
@@ -41,31 +43,37 @@ namespace Buds3ProAideAuditivelA.v2
         private SeekBar _sbBass, _sbTreble;
         private Spinner _spBassFreq, _spTrebleFreq;
 
-        // --- Nouveaux contrôles Qualité ---
+        // --- Qualité voix ---
         private Button _btnQualDrop;
         private LinearLayout _qualPanel;
 
         private Switch _swPresence;
         private TextView _lblPresence, _lblPresenceHz;
-        private SeekBar _sbPresence; // −8..+8 dB (offset 8)
-        private Spinner _spPresenceHz; // 1–3 kHz
+        private SeekBar _sbPresence;
+        private Spinner _spPresenceHz;
 
         private Switch _swHum;
-        private Spinner _spHumBase; // 50/60
+        private Spinner _spHumBase;
 
         private Switch _swDeEsser;
         private TextView _lblDeEsser;
-        private SeekBar _sbDeEsser; // 0..8 dB (max attén)
+        private SeekBar _sbDeEsser;
 
         // Headroom meter
         private TextView _lblHeadroom;
+
+        // Logs
+        private ScrollView _logScroll;
 
         protected override void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
 
+            // Root scrollable container
+            var scroll = new ScrollView(this);
             var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
             root.SetPadding(24, 24, 24, 24);
+            scroll.AddView(root);
 
             // --- Principal ---
             _btnStart = new Button(this) { Text = "START" };
@@ -84,7 +92,17 @@ namespace Buds3ProAideAuditivelA.v2
             // Latence + Logs
             _latency = new TextView(this) { Text = "Latence: -- ms", TextSize = 12f };
             _swShowLogs = new Switch(this) { Text = "Afficher les logs", Checked = true };
-            _status = new TextView(this) { Text = "Prêt.", TextSize = 12f };
+            _status = new TextView(this)
+            {
+                Text = "Prêt.",
+                TextSize = 12f
+            };
+            _status.SetPadding(12, 12, 12, 12);
+            _status.SetBackgroundColor(Android.Graphics.Color.Argb(24, 255, 255, 255));
+
+            _logScroll = new ScrollView(this);
+            _logScroll.AddView(_status);
+            _logScroll.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 600);
 
             // --- Panneau NC ---
             _ncPanel = new LinearLayout(this) { Orientation = Orientation.Vertical, Visibility = ViewStates.Visible };
@@ -93,7 +111,7 @@ namespace Buds3ProAideAuditivelA.v2
             _sbAmbCut = new SeekBar(this) { Max = 24, Progress = 12 };
 
             _lblAmbRelease = new TextView(this) { Text = "Relâche expander: 150 ms" };
-            _sbAmbRelease = new SeekBar(this) { Max = 300, Progress = 150 }; // 50..300 (on borne en code)
+            _sbAmbRelease = new SeekBar(this) { Max = 300, Progress = 150 };
 
             _swHp = new Switch(this) { Text = "High-pass", Checked = false };
             _spHpCut = new Spinner(this);
@@ -117,13 +135,13 @@ namespace Buds3ProAideAuditivelA.v2
             _sbTreble = new SeekBar(this) { Max = 24, Progress = 12 };
             _spTrebleFreq = new Spinner(this);
 
-            // --- Panneau Qualité (nouveau) ---
+            // --- Qualité (présence / hum / de-esser) ---
             _btnQualDrop = new Button(this) { Text = "Qualité voix ▼" };
             _qualPanel = new LinearLayout(this) { Orientation = Orientation.Vertical, Visibility = ViewStates.Gone };
 
             _swPresence = new Switch(this) { Text = "Présence voix (1–3 kHz)", Checked = true };
             _lblPresence = new TextView(this) { Text = "Présence: 0 dB" };
-            _sbPresence = new SeekBar(this) { Max = 16, Progress = 8 }; // −8..+8 (offset 8)
+            _sbPresence = new SeekBar(this) { Max = 16, Progress = 8 };
             _lblPresenceHz = new TextView(this) { Text = "Fréquence présence: 2.0 kHz" };
             _spPresenceHz = new Spinner(this);
 
@@ -200,10 +218,8 @@ namespace Buds3ProAideAuditivelA.v2
             _qualPanel.AddView(_sbPresence);
             _qualPanel.AddView(_lblPresenceHz);
             _qualPanel.AddView(_spPresenceHz);
-
             _qualPanel.AddView(_swHum);
             _qualPanel.AddView(_spHumBase);
-
             _qualPanel.AddView(_swDeEsser);
             _qualPanel.AddView(_lblDeEsser);
             _qualPanel.AddView(_sbDeEsser);
@@ -227,25 +243,31 @@ namespace Buds3ProAideAuditivelA.v2
             root.AddView(_btnQualDrop);
             root.AddView(_qualPanel);
 
+
+            // Graphique temps réel
+            _chart = new RealtimeChartView(this);
+            _chart.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 320);
+            root.AddView(_chart);
             root.AddView(_lblHeadroom);
             root.AddView(_latency);
 
             root.AddView(_swShowLogs);
-            root.AddView(_status);
+            root.AddView(_logScroll);
 
-            SetContentView(root);
+            SetContentView(scroll);
 
             _engine = new AudioEngine(this);
             _engine.SetMetersCallback((pkDb, rmsDb, grDb) =>
             {
                 RunOnUiThread(() =>
                 {
-                    var head = (0 - pkDb);
+                    var head = pkDb <= 0f ? -pkDb : 0f;
                     _lblHeadroom.Text = $"Headroom: {head:0.0} dB | Peak {pkDb:0.0} dBFS | RMS {rmsDb:0.0} dBFS | GR {grDb:0.0} dB";
+                    _chart?.AddPoint(pkDb, rmsDb, grDb, head);
                 });
             });
 
-            _latMeter = new LatencyMeter(_engine, ms => RunOnUiThread(() => _latency.Text = $"Latence: {ms} ms"));
+            _latMeter = new LatencyMeter(_engine, ms => RunOnUiThread(() => _latency.Text = $"Latence: {ms} ms"), 400);
 
             // Boutons
             _btnStart.Click += (s, e) => StartEngine();
@@ -341,7 +363,7 @@ namespace Buds3ProAideAuditivelA.v2
             _swPresence.CheckedChange += (s, e) => _engine.SetPresenceEnabled(e.IsChecked);
             _sbPresence.ProgressChanged += (s, e) =>
             {
-                int db = e.Progress - 8; // −8..+8
+                int db = e.Progress - 8;
                 _engine.SetPresenceDb(db);
                 _lblPresence.Text = $"Présence: {db:+#;-#;0} dB";
             };
@@ -368,7 +390,7 @@ namespace Buds3ProAideAuditivelA.v2
 
             _swShowLogs.CheckedChange += (s, e) =>
             {
-                _status.Visibility = e.IsChecked ? ViewStates.Visible : ViewStates.Gone;
+                _logScroll.Visibility = e.IsChecked ? ViewStates.Visible : ViewStates.Gone;
             };
 
             UpdateUiState();
@@ -376,13 +398,10 @@ namespace Buds3ProAideAuditivelA.v2
 
         private void SetNcEnabled(bool enabled)
         {
+            // Ne pas masquer EQ/Qualité : on ne touche qu'au panneau NC.
             _ncPanel.Visibility = enabled ? ViewStates.Visible : ViewStates.Gone;
             _btnNcDrop.Enabled = enabled;
             _btnCalib.Visibility = enabled ? ViewStates.Visible : ViewStates.Gone;
-            _lblAmb.Visibility = enabled ? ViewStates.Visible : ViewStates.Gone;
-            _sbAmbCut.Visibility = enabled ? ViewStates.Visible : ViewStates.Gone;
-            _lblAmbRelease.Visibility = enabled ? ViewStates.Visible : ViewStates.Gone;
-            _sbAmbRelease.Visibility = enabled ? ViewStates.Visible : ViewStates.Gone;
 
             if (!enabled)
             {
@@ -405,11 +424,11 @@ namespace Buds3ProAideAuditivelA.v2
 
         public void Log(string msg)
         {
-            if (_status.Visibility != ViewStates.Visible) { try { Android.Util.Log.Debug("Buds3ProUI", msg); } catch { } return; }
             RunOnUiThread(() =>
             {
                 string t = DateTime.Now.ToString("HH:mm:ss.fff");
                 _status.Text = $"[{t}] {msg}\n{_status.Text}";
+                _logScroll.FullScroll(FocusSearchDirection.Up);
             });
             try { Android.Util.Log.Debug("Buds3ProUI", msg); } catch { }
         }
@@ -533,27 +552,6 @@ namespace Buds3ProAideAuditivelA.v2
             {
                 Toast.MakeText(this, "Permission micro requise", ToastLength.Short).Show();
             }
-        }
-
-        // --- LatencyMeter helper (minimal) ---
-        private sealed class LatencyMeter : IDisposable
-        {
-            private readonly AudioEngine _eng;
-            private readonly Action<int> _cb;
-            private readonly Timer _timer;
-
-            public LatencyMeter(AudioEngine eng, Action<int> onLatencyMs)
-            {
-                _eng = eng;
-                _cb = onLatencyMs ?? (_ => { });
-                _timer = new Timer(500);
-                _timer.Elapsed += (s, e) => { try { _cb(_eng.EstimatedLatencyMs); } catch { } };
-                _timer.AutoReset = true;
-            }
-
-            public void Start() { _timer.Start(); }
-            public void Stop() { _timer.Stop(); }
-            public void Dispose() { _timer.Dispose(); }
         }
     }
 }

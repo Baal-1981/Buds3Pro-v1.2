@@ -1,0 +1,22 @@
+# Fichiers de build
+bin/
+obj/
+.vs/
+
+# Utilisateur
+*.user
+*.suo
+
+# Paquets
+*.nupkg
+*.snupkg
+packages/
+*.dll
+*.exe
+
+# Android / Xamarin
+*.apk
+*.aab
+
+# Logs
+*.log

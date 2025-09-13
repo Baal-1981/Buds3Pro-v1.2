@@ -2,30 +2,31 @@
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.companyname.buds3proaidia"
-    android:installLocation="auto">
+    android:installLocation="auto"
+    android:versionCode="120003"
+    android:versionName="1.2.0">
 
-	<!-- Cibles (conforme à ton projet) -->
+	<!-- Niveaux de SDK -->
 	<uses-sdk
         android:minSdkVersion="28"
-        android:targetSdkVersion="33" />
+        android:targetSdkVersion="35" />
 
 	<!-- Audio -->
 	<uses-permission android:name="android.permission.RECORD_AUDIO" />
 	<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
-	<!-- Bluetooth :
-         - Pré-Android 12 (API <= 30) : anciennes permissions avec maxSdkVersion=30
-         - Android 12+ (API 31+) : BLUETOOTH_CONNECT
-         Si tu fais du SCAN d'appareils, ajoute BLUETOOTH_SCAN (voir plus bas). -->
+	<!-- Bluetooth
+         - Pré-Android 12 (API <= 30) : anciennes permissions limitées à maxSdkVersion=30
+         - Android 12+ (API 31+) : BLUETOOTH_CONNECT (et éventuellement BLUETOOTH_SCAN si tu scannes) -->
 	<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
 	<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
 	<uses-permission
         android:name="android.permission.BLUETOOTH_CONNECT"
         android:usesPermissionFlags="neverForLocation" />
 
-	<!-- (Optionnel) Si tu scannes des appareils Bluetooth sur Android 12+ :
-         Décommente la permission ci-dessous. Pour Android <= 11, le scan requiert
-         aussi ACCESS_FINE_LOCATION (souvent nécessaire). Laisse commenté si tu ne scannes pas. -->
+	<!-- (Optionnel) Scan Bluetooth sur Android 12+.
+         Sur Android <= 11, le scan demandera souvent ACCESS_FINE_LOCATION.
+         Décommente uniquement si tu scannes réellement. -->
 	<!--
     <uses-permission
         android:name="android.permission.BLUETOOTH_SCAN"
@@ -33,7 +34,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
     -->
 
-	<!-- (Optionnel) Service au 1er plan si tu fais de l’audio continu en arrière-plan -->
+	<!-- (Optionnel) Service au 1er plan pour audio continu en arrière-plan -->
 	<!--
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
@@ -44,10 +45,10 @@
 	<uses-feature android:name="android.hardware.audio.low_latency" android:required="false" />
 
 	<application
-        android:label="Buds3Pro Aide Auditive IA"
+        android:label="@string/app_name"
         android:allowBackup="true"
         android:usesCleartextTraffic="true">
-		<!-- Pas d’<activity> ici : elle est générée par l’attribut [Activity(..., MainLauncher=true, Exported=true)]
-             dans MainActivity.cs (requis depuis targetSdk 31+). -->
+		<!-- Aucune <activity> ici : elle est générée par l’attribut
+             [Activity(..., MainLauncher=true, Exported=true)] dans MainActivity.cs. -->
 	</application>
 </manifest>

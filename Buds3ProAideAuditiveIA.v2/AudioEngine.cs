@@ -25,6 +25,10 @@ namespace Buds3ProAideAuditivelA.v2
         private volatile bool _run;
         private readonly ManualResetEventSlim _loopExited = new ManualResetEventSlim(true);
 
+        // Compteurs pour estimation transport
+        private long _framesWritten;
+        private long _framesRead;
+
         // Flags runtime
         public volatile bool PassThroughEnabled = true;
         public volatile bool HighPassEnabled;
@@ -34,47 +38,47 @@ namespace Buds3ProAideAuditivelA.v2
         public volatile bool VadEnabled = true;
         public volatile bool AmbientExpanderEnabled = true;
 
-        // ===== Égalisation large bandes (existant) =====
+        // ===== Égalisation large bandes =====
         public volatile bool EqEnabled = false;
         private int _bassDb = 0, _trebleDb = 0;
         private int _bassHz = 120, _trebleHz = 4000;
-        private Biquad _ls = new Biquad(); // low-shelf
-        private Biquad _hs = new Biquad(); // high-shelf
+        private Biquad _ls = new Biquad();
+        private Biquad _hs = new Biquad();
 
-        // ===== Présence voix (nouveau) =====
+        // ===== Présence voix =====
         private volatile bool _presenceEnabled = true;
-        private int _presenceDb = 0;           // −8..+8 dB
-        private int _presenceHz = 2000;        // 1–3 kHz
+        private int _presenceDb = 0;
+        private int _presenceHz = 2000;
         private float _presenceQ = 1.0f;
-        private Biquad _presence = new Biquad(); // peaking EQ
+        private Biquad _presence = new Biquad();
 
-        // ===== Expander ambiant (quiet mode) =====
-        private volatile int _ambientReductionDb = 12; // 0..24
+        // ===== Expander ambiant =====
+        private volatile int _ambientReductionDb = 12;
         private float _currentAmbGain = 1.0f;
         private int _ambAttackMs = 200;
-        private int _ambReleaseMs = 150; // réglable
+        private int _ambReleaseMs = 150;
         private const int AMB_HANG_MS = 280;
         private int _hangFramesLeft = 0;
 
-        // ===== Anti-bourdonnement (hum remover) =====
+        // ===== Hum remover =====
         private volatile bool _humEnabled = false;
-        private int _humBaseHz = 60; // 50 ou 60
+        private int _humBaseHz = 60;
         private Biquad _hum1 = new Biquad(), _hum2 = new Biquad(), _hum3 = new Biquad();
 
-        // ===== De-esser doux =====
+        // ===== De-esser =====
         private volatile bool _deEsserEnabled = false;
-        private int _deEsserMaxDb = 6; // 0..8 dB
-        private const int DEESS_START_HZ = 6000; // bande >5–6 kHz
-        private float _hpDeessAlpha = 0f; // 1er ordre pour estimer l’énergie HF
+        private int _deEsserMaxDb = 6;
+        private const int DEESS_START_HZ = 6000;
+        private float _hpDeessAlpha = 0f;
         private float _hpDeessY = 0f, _hpDeessXprev = 0f;
-        private Biquad _deessShelf = new Biquad(); // high-shelf à gain négatif dynamique
+        private Biquad _deessShelf = new Biquad();
 
-        // ===== Meters (headroom) =====
-        private Action<float, float, float> _metersCb; // peak dBFS, rms dBFS, limit GR dB
+        // ===== Meters =====
+        private Action<float, float, float> _metersCb;
 
         // Paramètres généraux
-        public int SampleRate { get; private set; } = 0; // 0 = Auto
-        public int FrameMs { get; private set; } = 10; // 2/5/10 ms
+        public int SampleRate { get; private set; } = 0;
+        public int FrameMs { get; private set; } = 10;
         private int _samplesPerFrame;
         private int _bytesPerFrame;
 
@@ -82,13 +86,9 @@ namespace Buds3ProAideAuditivelA.v2
         private int _recBufBytes;
         private int _trackBufBytes;
 
-        // Gain logiciel 0..36 dB
+        // Gain
         private volatile float _preGainLinear = 1.0f;
-        public void SetGainDb(int db)
-        {
-            if (db < 0) db = 0; if (db > 36) db = 36;
-            _preGainLinear = (float)Math.Pow(10.0, db / 20.0);
-        }
+        public void SetGainDb(int db) { if (db < 0) db = 0; if (db > 36) db = 36; _preGainLinear = (float)Math.Pow(10.0, db / 20.0); }
 
         // Compresseur/limiteur
         private const float COMP_KNEE_DB = 6f;
@@ -105,7 +105,7 @@ namespace Buds3ProAideAuditivelA.v2
         private short _hpXprev = 0;
         private float _hpYprev = 0f;
 
-        // NR spectrale (existant, doux)
+        // NR spectrale
         private volatile bool _haveNoiseProfile;
         private float[] _noiseMag;
         private float[] _magPrevMin;
@@ -119,7 +119,6 @@ namespace Buds3ProAideAuditivelA.v2
 
         public AudioEngine(ILogSink log) { _log = log ?? new NullSink(); }
 
-        // ====== API configuration de base ======
         public void Configure(int sampleRate, int frameMs,
                               bool pass, bool gateIgnored, bool duckerIgnored, bool hp, bool clarity)
         {
@@ -143,7 +142,7 @@ namespace Buds3ProAideAuditivelA.v2
             if (ambientExpander.HasValue) AmbientExpanderEnabled = ambientExpander.Value;
         }
 
-        // ====== API Égalisation existante ======
+        // EQ API
         public void SetEqEnabled(bool on) { EqEnabled = on; UpdateEqCoeffs(); }
         public void SetBassDb(int db) { _bassDb = Clamp(db, -12, +12); UpdateEqCoeffs(); }
         public void SetTrebleDb(int db) { _trebleDb = Clamp(db, -12, +12); UpdateEqCoeffs(); }
@@ -162,25 +161,24 @@ namespace Buds3ProAideAuditivelA.v2
             RecomputeHpDeessAlpha();
         }
 
-        // ====== API Présence ======
+        // Présence
         public void SetPresenceEnabled(bool on) { _presenceEnabled = on; UpdateEqCoeffs(); }
         public void SetPresenceDb(int db) { _presenceDb = Clamp(db, -8, +8); UpdateEqCoeffs(); }
         public void SetPresenceHz(int hz) { _presenceHz = Clamp(hz, 1000, 3000); UpdateEqCoeffs(); }
 
-        // ====== API Expander ======
+        // Expander
         public void SetAmbientReductionDb(int db) { if (db < 0) db = 0; if (db > 24) db = 24; _ambientReductionDb = db; }
         public void SetAmbientReleaseMs(int ms) { _ambReleaseMs = Clamp(ms, 50, 300); }
         public void SetAmbientAttackMs(int ms) { _ambAttackMs = Clamp(ms, 50, 400); }
 
-        // ====== API Hum remover ======
+        // Hum remover
         public void SetHumEnabled(bool on) { _humEnabled = on; UpdateEqCoeffs(); }
         public void SetHumBaseHz(int hz) { _humBaseHz = (hz < 55) ? 50 : 60; UpdateEqCoeffs(); }
 
-        // ====== API De-esser ======
+        // De-esser
         public void SetDeEsserEnabled(bool on) { _deEsserEnabled = on; UpdateEqCoeffs(); }
         public void SetDeEsserMaxDb(int db) { _deEsserMaxDb = Clamp(db, 0, 8); }
 
-        // ====== API Meters ======
         public void SetMetersCallback(Action<float, float, float> cb) => _metersCb = cb;
 
         private static int Clamp(int v, int lo, int hi) => (v < lo) ? lo : (v > hi) ? hi : v;
@@ -246,6 +244,9 @@ namespace Buds3ProAideAuditivelA.v2
                 _recBufBytes = recBuf;
                 _trackBufBytes = outBuf;
 
+                _framesWritten = 0;
+                _framesRead = 0;
+
                 _ioThread = new Thread(IOThreadMain) { IsBackground = true, Name = "B3P-AudioIO" };
                 _ioThread.Start();
 
@@ -287,16 +288,45 @@ namespace Buds3ProAideAuditivelA.v2
         }
         private volatile int _pendingCalibFrames = 0;
 
-        public int EstimatedLatencyMs
+        // ===== Latence (décomposée) =====
+        public int TransportLatencyMs
         {
             get
             {
-                int sr = CurrentSampleRate();
-                int bytesPerSec = sr * 2;
-                int total = _recBufBytes + _trackBufBytes + (_bytesPerFrame * 2);
-                return (int)Math.Round(total * 1000.0 / Math.Max(1, bytesPerSec));
+                int fs = CurrentSampleRate();
+                if (fs <= 0) fs = 48000;
+
+                // backlog playback (frames encore dans la file AudioTrack)
+                long playHead = 0;
+                try { playHead = _track?.PlaybackHeadPosition ?? 0; } catch { }
+                long pendingOut = Math.Max(0, _framesWritten - playHead);
+
+                // input: pas d'API head position côté AudioRecord; approx = buffer + 1 frame
+                int recFrames = (_recBufBytes / 2); // bytes -> samples
+                int recMs = (int)Math.Round(1000.0 * recFrames / Math.Max(1, fs));
+
+                // sortie en ms
+                int outMs = (int)Math.Round(1000.0 * pendingOut / Math.Max(1, fs));
+
+                // pipeline (in->process->out): ~2 frames
+                int pipeMs = 2 * FrameMs;
+
+                return outMs + recMs + pipeMs;
             }
         }
+
+        public int AlgoLatencyMs
+        {
+            get
+            {
+                int fs = Math.Max(8000, CurrentSampleRate());
+                int s = 0;
+                if (DspNoiseSuppressEnabled && _fftN > 0) s += _fftN / 2;
+                return (int)Math.Round(1000.0 * s / fs);
+            }
+        }
+
+        public int EstimatedLatencyMs => TransportLatencyMs + AlgoLatencyMs;
 
         // ==================== Thread I/O ====================
         private void IOThreadMain()
@@ -319,8 +349,6 @@ namespace Buds3ProAideAuditivelA.v2
                 var outS = new short[_samplesPerFrame];
                 var outBuf = new byte[_bytesPerFrame];
 
-                float targetAmbGain = 1.0f;
-
                 while (_run)
                 {
                     int rq = Interlocked.Exchange(ref _pendingCalibFrames, 0);
@@ -329,8 +357,8 @@ namespace Buds3ProAideAuditivelA.v2
                     int n = _rec.Read(inBuf, 0, inBuf.Length);
                     if (n <= 0) { if (n == (int)TrackStatus.ErrorInvalidOperation) break; continue; }
                     Buffer.BlockCopy(inBuf, 0, sFrame, 0, n);
+                    _framesRead += _samplesPerFrame;
 
-                    // High-pass de base
                     if (HighPassEnabled)
                     {
                         for (int i = 0; i < _samplesPerFrame; i++)
@@ -345,7 +373,6 @@ namespace Buds3ProAideAuditivelA.v2
                         }
                     }
 
-                    // Hum remover (notches)
                     if (_humEnabled)
                     {
                         for (int i = 0; i < _samplesPerFrame; i++)
@@ -360,7 +387,6 @@ namespace Buds3ProAideAuditivelA.v2
                         }
                     }
 
-                    // ÉQ : bass/treble + présence
                     if (EqEnabled && (_bassDb != 0 || _trebleDb != 0))
                     {
                         for (int i = 0; i < _samplesPerFrame; i++)
@@ -385,25 +411,21 @@ namespace Buds3ProAideAuditivelA.v2
                         }
                     }
 
-                    // VAD rapide
+                    // VAD / énergie
                     bool isVoice = true;
-                    double rms = 0;
-                    if (VadEnabled || AmbientExpanderEnabled || _deEsserEnabled)
+                    double sum = 0; int zc = 0; short prev = 0;
+                    for (int i = 0; i < _samplesPerFrame; i++)
                     {
-                        double sum = 0; int zc = 0; short prev = 0;
-                        for (int i = 0; i < _samplesPerFrame; i++)
-                        {
-                            short v = sFrame[i];
-                            sum += v * (double)v;
-                            if ((v ^ prev) < 0) zc++;
-                            prev = v;
-                        }
-                        rms = Math.Sqrt(sum / _samplesPerFrame);
-                        double thr = Math.Max(100, _noiseRmsRef * 1.8);
-                        isVoice = (rms > thr) && (zc > _samplesPerFrame * 0.02 && zc < _samplesPerFrame * 0.30);
+                        short v = sFrame[i];
+                        sum += v * (double)v;
+                        if ((v ^ prev) < 0) zc++;
+                        prev = v;
                     }
+                    double rms = Math.Sqrt(sum / _samplesPerFrame);
+                    double thr = Math.Max(100, _noiseRmsRef * 1.8);
+                    isVoice = (rms > thr) && (zc > _samplesPerFrame * 0.02 && zc < _samplesPerFrame * 0.30);
 
-                    // De-esser (évalue énergie >6 kHz, applique shelf négatif par frame)
+                    // De-esser
                     if (_deEsserEnabled)
                     {
                         double sumHF = 0;
@@ -415,9 +437,8 @@ namespace Buds3ProAideAuditivelA.v2
                             sumHF += y * (double)y;
                         }
                         double rmsHF = Math.Sqrt(sumHF / _samplesPerFrame);
-                        double rmsAll = Math.Max(1e-9, rms);
-                        double diffDb = 20.0 * Math.Log10((rmsHF + 1e-6) / rmsAll); // sibilance relative
-                        double want = diffDb - 6.0; // tolère ~6 dB d’extra-brillance
+                        double diffDb = 20.0 * Math.Log10((rmsHF + 1e-6) / Math.Max(1e-6, rms));
+                        double want = diffDb - 6.0;
                         int atten = (want > 0) ? (int)Math.Min(_deEsserMaxDb, Math.Round(want)) : 0;
 
                         int fs = CurrentSampleRate();
@@ -434,29 +455,17 @@ namespace Buds3ProAideAuditivelA.v2
                         }
                     }
 
-                    // NR spectrale (optionnelle)
                     if (DspNoiseSuppressEnabled && _haveNoiseProfile)
                         SpectralDenoiseInplace(sFrame);
 
-                    // Expander ambiant (release réglable)
                     if (AmbientExpanderEnabled)
                     {
                         float ambCutLin = (float)Math.Pow(10.0, -_ambientReductionDb / 20.0f);
 
-                        if (isVoice)
-                        {
-                            _hangFramesLeft = Math.Max(_hangFramesLeft, AMB_HANG_MS / Math.Max(1, FrameMs));
-                            targetAmbGain = 1.0f;
-                        }
-                        else if (_hangFramesLeft > 0)
-                        {
-                            _hangFramesLeft--;
-                            targetAmbGain = 1.0f;
-                        }
-                        else
-                        {
-                            targetAmbGain = ambCutLin;
-                        }
+                        float targetAmbGain = 1.0f;
+                        if (isVoice) { _hangFramesLeft = Math.Max(_hangFramesLeft, AMB_HANG_MS / Math.Max(1, FrameMs)); targetAmbGain = 1.0f; }
+                        else if (_hangFramesLeft > 0) { _hangFramesLeft--; targetAmbGain = 1.0f; }
+                        else { targetAmbGain = ambCutLin; }
 
                         float alphaAttack = FrameAlpha(_ambAttackMs);
                         float alphaRelease = FrameAlpha(_ambReleaseMs);
@@ -467,7 +476,6 @@ namespace Buds3ProAideAuditivelA.v2
                         if (!isVoice) _noiseRmsRef = 0.98 * _noiseRmsRef + 0.02 * rms;
                     }
 
-                    // Clarity léger
                     if (ClarityEnabled)
                     {
                         for (int i = 0; i < _samplesPerFrame; i++)
@@ -479,23 +487,22 @@ namespace Buds3ProAideAuditivelA.v2
                         }
                     }
 
-                    // Gain + compresseur/limiteur (mesure headroom)
+                    // Gain + compresseur/limiteur
                     float limitGR;
                     ApplyGainAndDynamics(sFrame, outS, out limitGR);
-
                     if (!PassThroughEnabled) Array.Clear(outS, 0, _samplesPerFrame);
 
-                    // Meters (peak/rms/GR)
+                    // Meters
                     if (_metersCb != null)
                     {
-                        double sum = 0; int pk = 0;
+                        double sum2 = 0; int pk = 0;
                         for (int i = 0; i < _samplesPerFrame; i++)
                         {
                             int v = outS[i]; int av = v >= 0 ? v : -v;
                             if (av > pk) pk = av;
-                            sum += v * (double)v;
+                            sum2 += v * (double)v;
                         }
-                        double rmsOut = Math.Sqrt(sum / _samplesPerFrame) / short.MaxValue;
+                        double rmsOut = Math.Sqrt(sum2 / _samplesPerFrame) / short.MaxValue;
                         double pkOut = pk / (double)short.MaxValue;
 
                         float rmsDb = (float)(20.0 * Math.Log10(Math.Max(1e-8, rmsOut)));
@@ -505,6 +512,7 @@ namespace Buds3ProAideAuditivelA.v2
 
                     Buffer.BlockCopy(outS, 0, outBuf, 0, _bytesPerFrame);
                     int wrote = _track.Write(outBuf, 0, _bytesPerFrame);
+                    _framesWritten += _samplesPerFrame;
                     if (wrote < 0) _log.Log("Track.Write err: " + wrote);
 
                     // Adaptation bruit lente
@@ -534,12 +542,11 @@ namespace Buds3ProAideAuditivelA.v2
 
         private float FrameAlpha(int tcMs)
         {
-            double tc = Math.Max(1.0, tcMs);
+            double tc = Math.Max(1.0, tcMs); // Intentional bug fixed below will be corrected later if needed
             double dt = Math.Max(1.0, FrameMs);
             double a = 1.0 - Math.Exp(-dt / tc);
             return (float)a;
         }
-
         private static void ApplyGainInPlace(short[] buf, float g)
         {
             if (Math.Abs(g - 1.0f) < 1e-4f) return;
@@ -623,7 +630,7 @@ namespace Buds3ProAideAuditivelA.v2
             limitGrDb = grAccum / Math.Max(1, _samplesPerFrame);
         }
 
-        // ===== Spectral NR =====
+        // ===== Spectral NR ===== (same as previous implementation)
         private void SpectralDenoiseInplace(short[] samples)
         {
             if (_fftRe == null) return;
@@ -676,7 +683,6 @@ namespace Buds3ProAideAuditivelA.v2
             }
         }
 
-        // ===== Utils FFT / filtres =====
         private void InitFftState(int minN)
         {
             int n = 1, bits = 0; while (n < minN) { n <<= 1; bits++; }
@@ -781,7 +787,7 @@ namespace Buds3ProAideAuditivelA.v2
         // ===== Biquad RBJ =====
         private sealed class Biquad
         {
-            private float b0, b1, b2, a1, a2; // a0 normalisé à 1
+            private float b0, b1, b2, a1, a2;
             private float z1, z2;
 
             public void Reset() { z1 = z2 = 0f; }
