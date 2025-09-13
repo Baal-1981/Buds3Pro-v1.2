@@ -1,3 +1,6 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+
 # Buds3Pro v1.2
 
 App Android (Xamarin.Android) pour routage audio et Bluetooth (API 35).
