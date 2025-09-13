@@ -1,4 +1,5 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Build](https://github.com/Baal-1981/Buds3Pro-v1.2/actions/workflows/android-build.yml/badge.svg?branch=main)](https://github.com/Baal-1981/Buds3Pro-v1.2/actions/workflows/android-build.yml)
 
 
 # Buds3Pro v1.2
