@@ -1,17 +1,20 @@
 ﻿using Android;
 using Android.App;
+using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 using Android.Runtime;
 using Android.Views;
 using Android.Widget;
+using AndroidX.AppCompat.App;                 // AppCompatActivity + AlertDialog
+using Buds3ProAideAuditivelA.v2.Helpers;      // LocaleManager
 using System;
 
 namespace Buds3ProAideAuditivelA.v2
 {
     [Activity(Label = "Buds3Pro Aide Auditive IA", MainLauncher = true, Exported = true,
               ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize)]
-    public class MainActivity : Activity, ILogSink
+    public class MainActivity : AppCompatActivity, ILogSink
     {
         private const int ReqAudio = 0xB301;
 
@@ -65,9 +68,15 @@ namespace Buds3ProAideAuditivelA.v2
         // Logs
         private ScrollView _logScroll;
 
+        protected override void AttachBaseContext(Context newBase)
+        {
+            base.AttachBaseContext(LocaleManager.Wrap(newBase));
+        }
+
         protected override void OnCreate(Bundle savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
+            Title = GetString(Resource.String.title_main);
 
             // Root scrollable container
             var scroll = new ScrollView(this);
@@ -540,6 +549,47 @@ namespace Buds3ProAideAuditivelA.v2
         }
 
         private void UpdateUiState() => SetControlsEnabled(_engine?.IsRunning == true);
+
+        public override bool OnCreateOptionsMenu(Android.Views.IMenu menu)
+        {
+            MenuInflater.Inflate(Resource.Menu.main_menu, menu);
+            return base.OnCreateOptionsMenu(menu);
+        }
+
+        public override bool OnOptionsItemSelected(Android.Views.IMenuItem item)
+        {
+            switch (item.ItemId)
+            {
+                case Resource.Id.action_language:
+                    ShowLanguageDialog();
+                    return true;
+
+                case Resource.Id.action_logs:
+                    Toast.MakeText(this, "Logs: page à venir", ToastLength.Short).Show();
+                    return true;
+
+                case Resource.Id.action_help:
+                    Toast.MakeText(this, "Aide: page à venir", ToastLength.Short).Show();
+                    return true;
+            }
+            return base.OnOptionsItemSelected(item);
+        }
+
+        private void ShowLanguageDialog()
+        {
+            var langs = new[] { GetString(Resource.String.lang_en), GetString(Resource.String.lang_fr) };
+
+            new AndroidX.AppCompat.App.AlertDialog.Builder(this)
+                .SetTitle(Resource.String.lang_dialog_title)
+                .SetItems(langs, (s, e) =>
+                {
+                    var code = (e.Which == 0) ? "en" : "fr";
+                    LocaleManager.SetLocale(this, code);
+                    Recreate(); // recharge l’Activity pour appliquer la nouvelle langue
+                })
+                .SetNegativeButton(Android.Resource.String.Cancel, (s, e) => { })
+                .Show();
+        }
 
         public override void OnRequestPermissionsResult(int requestCode, string[] permissions, [GeneratedEnum] Permission[] grantResults)
         {
