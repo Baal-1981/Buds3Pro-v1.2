@@ -1,8 +1,13 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
+    <!-- Compile avec Android 13 (API 33) = v13.0 -->
+    <TargetFrameworkVersion>v13.0</TargetFrameworkVersion>
+
+    <!-- Cible Play Store -->
     <AndroidTargetSdkVersion>35</AndroidTargetSdkVersion>
-    <AndroidUseLatestPlatformSdk>true</AndroidUseLatestPlatformSdk>
+    <AndroidUseLatestPlatformSdk>false</AndroidUseLatestPlatformSdk>
+
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>8.0.30703</ProductVersion>
@@ -20,8 +25,6 @@
     <AndroidResgenFile>Resources\Resource.designer.cs</AndroidResgenFile>
     <AndroidResgenClass>Resource</AndroidResgenClass>
     <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
-    <AndroidUseLatestPlatformSdk>false</AndroidUseLatestPlatformSdk>
-    <TargetFrameworkVersion>v13.0</TargetFrameworkVersion>
     <AndroidManifest>Properties\AndroidManifest.xml</AndroidManifest>
     <MonoAndroidResourcePrefix>Resources</MonoAndroidResourcePrefix>
     <MonoAndroidAssetsPrefix>Assets</MonoAndroidAssetsPrefix>
@@ -29,6 +32,7 @@
     <AndroidUseAapt2>true</AndroidUseAapt2>
     <AndroidHttpClientHandlerType>Xamarin.Android.Net.AndroidClientHandler</AndroidHttpClientHandlerType>
   </PropertyGroup>
+
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>True</DebugSymbols>
     <DebugType>portable</DebugType>
@@ -44,6 +48,7 @@
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
     <BundleAssemblies>false</BundleAssemblies>
   </PropertyGroup>
+
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugSymbols>True</DebugSymbols>
     <DebugType>portable</DebugType>
@@ -64,11 +69,10 @@
     <AndroidPackageFormat>aab</AndroidPackageFormat>
     <AndroidSupportedAbis />
     <AndroidKeyStore>false</AndroidKeyStore>
-    <AndroidSigningKeyStore>
-    </AndroidSigningKeyStore>
-    <AndroidSigningStorePass>
-    </AndroidSigningStorePass>
+    <AndroidSigningKeyStore></AndroidSigningKeyStore>
+    <AndroidSigningStorePass></AndroidSigningStorePass>
   </PropertyGroup>
+
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Xml" />
@@ -77,6 +81,7 @@
     <Reference Include="System.Numerics" />
     <Reference Include="System.Numerics.Vectors" />
   </ItemGroup>
+
   <ItemGroup>
     <Compile Include="ApmWrapper.cs" />
     <Compile Include="AudioEffects_EnableNative.cs" />
@@ -95,13 +100,14 @@
     <Compile Include="Resources\Resource.designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SpectralNoiseReducer.cs" />
-    <Compile Include="using System%3b.cs" />
   </ItemGroup>
+
   <ItemGroup>
     <None Include="Resources\AboutResources.txt" />
     <None Include="Properties\AndroidManifest.xml" />
     <None Include="Assets\AboutAssets.txt" />
   </ItemGroup>
+
   <ItemGroup>
     <AndroidResource Include="Resources\layout\activity_main.xml">
       <SubType>Designer</SubType>
@@ -133,27 +139,25 @@
     <AndroidResource Include="Resources\mipmap-xxxhdpi\ic_launcher_foreground.png" />
     <AndroidResource Include="Resources\mipmap-xxxhdpi\ic_launcher_round.png" />
   </ItemGroup>
+
   <ItemGroup>
     <Folder Include="lib\arm64-v8a\" />
     <Folder Include="Resources\drawable\" />
   </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Xamarin.AndroidX.AppCompat" Version="1.2.0.5" />
     <PackageReference Include="Xamarin.Google.Android.Material" Version="1.0.0.1" />
     <PackageReference Include="Xamarin.Essentials" Version="1.6.1" />
   </ItemGroup>
+
   <ItemGroup>
     <None Include="Resources\layout\Main.axml" />
   </ItemGroup>
+
   <ItemGroup>
     <None Include="LICENSE" />
   </ItemGroup>
+
   <Import Project="$(MSBuildExtensionsPath)\Xamarin\Android\Xamarin.Android.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
-    Other similar extension points exist, see Microsoft.Common.targets.
-    <Target Name="BeforeBuild">
-    </Target>
-    <Target Name="AfterBuild">
-    </Target>
-  -->
 </Project>

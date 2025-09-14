@@ -6,49 +6,48 @@
     android:versionCode="120003"
     android:versionName="1.2.0">
 
-	<!-- Niveaux de SDK -->
-	<uses-sdk
-        android:minSdkVersion="28"
-        android:targetSdkVersion="35" />
+  <!-- Ciblage Play Store 2025 -->
+  <uses-sdk
+      android:minSdkVersion="24"
+      android:targetSdkVersion="35" />
 
-	<!-- Audio -->
-	<uses-permission android:name="android.permission.RECORD_AUDIO" />
-	<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+  <!-- Audio -->
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+  <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
-	<!-- Bluetooth
-         - Pré-Android 12 (API <= 30) : anciennes permissions limitées à maxSdkVersion=30
-         - Android 12+ (API 31+) : BLUETOOTH_CONNECT (et éventuellement BLUETOOTH_SCAN si tu scannes) -->
-	<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-	<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-	<uses-permission
-        android:name="android.permission.BLUETOOTH_CONNECT"
-        android:usesPermissionFlags="neverForLocation" />
+  <!-- Bluetooth :
+       - API <= 30 : anciennes permissions (bridées via maxSdkVersion)
+       - API 31+   : BLUETOOTH_CONNECT (et BLUETOOTH_SCAN si tu scannes) -->
+  <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+  <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+  <uses-permission
+      android:name="android.permission.BLUETOOTH_CONNECT"
+      android:usesPermissionFlags="neverForLocation" />
+  <!-- Décommente uniquement si tu scannes des appareils :
+  <uses-permission
+      android:name="android.permission.BLUETOOTH_SCAN"
+      android:usesPermissionFlags="neverForLocation" />
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+  -->
 
-	<!-- (Optionnel) Scan Bluetooth sur Android 12+.
-         Sur Android <= 11, le scan demandera souvent ACCESS_FINE_LOCATION.
-         Décommente uniquement si tu scannes réellement. -->
-	<!--
-    <uses-permission
-        android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
-    -->
+  <!-- (Optionnel) Service au 1er plan si tu maintiens de l'audio en arrière-plan -->
+  <!--
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+  -->
 
-	<!-- (Optionnel) Service au 1er plan pour audio continu en arrière-plan -->
-	<!--
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    -->
+  <!-- Capacités matérielles -->
+  <uses-feature android:name="android.hardware.microphone" android:required="true" />
+  <uses-feature android:name="android.hardware.audio.low_latency" android:required="false" />
 
-	<!-- Capacités matérielles -->
-	<uses-feature android:name="android.hardware.microphone" android:required="true" />
-	<uses-feature android:name="android.hardware.audio.low_latency" android:required="false" />
-
-	<application
-        android:label="@string/app_name"
-        android:allowBackup="true"
-        android:usesCleartextTraffic="true">
-		<!-- Aucune <activity> ici : elle est générée par l’attribut
-             [Activity(..., MainLauncher=true, Exported=true)] dans MainActivity.cs. -->
-	</application>
+  <application
+      android:label="@string/app_name"
+      android:icon="@mipmap/ic_launcher"
+      android:roundIcon="@mipmap/ic_launcher_round"
+      android:allowBackup="true"
+      android:supportsRtl="true"
+      android:usesCleartextTraffic="false">
+    <!-- Pas d'<activity> ici si tu utilises les attributs C# :
+         vérifie que MainActivity a [Activity(MainLauncher = true, Exported = true)] -->
+  </application>
 </manifest>
