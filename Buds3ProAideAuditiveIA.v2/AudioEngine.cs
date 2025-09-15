@@ -247,12 +247,20 @@ namespace Buds3ProAideAuditiveIA.v2
                 switch (_transport)
                 {
                     case AudioTransport.SCO:
+                        // Align sample rate for HFP (NB/WB). 16k est plus sûr et souvent requis.
+                        _fs = 16000;
+                        _n = _fs * _frameMs / 1000;
+
                         BluetoothRouting_Utilities.EnterCommunicationMode(_ctx);
-                        if (!BluetoothRouting_Utilities.EnsureSco(_ctx, 4000))
+                        if (!BluetoothRouting_Utilities.EnsureSco(_ctx, 5000))
                         {
                             _log.Log("[Route] SCO start failed; falling back to A2DP");
                             _transport = AudioTransport.A2DP;
                             BluetoothRouting_Utilities.LeaveCommunicationMode(_ctx);
+                        }
+                        else
+                        {
+                            try { BluetoothRouting_Utilities.ForceCommunicationDeviceSco(_ctx); } catch { }
                         }
                         break;
                     case AudioTransport.LE_LC3_AUTO:
@@ -264,11 +272,16 @@ namespace Buds3ProAideAuditiveIA.v2
                 }
 
                 // record
-                int minRec = AudioRecord.GetMinBufferSize(_fs, ChannelIn.Mono, Encoding.Pcm16bit);
+                int minRec = AudioRecord.GetMinBufferSize(
+                    _fs,
+                    ChannelIn.Mono,
+                    Encoding.Pcm16bit);
+
                 _recBufBytes = Math.Max(minRec, _n * 4);
                 var recSource = (_transport == AudioTransport.SCO)
                     ? AudioSource.VoiceCommunication
                     : AudioSource.Mic;
+
                 _rec = new AudioRecord(recSource, _fs, ChannelIn.Mono, Encoding.Pcm16bit, _recBufBytes);
                 if (_rec.State != State.Initialized) { _log.Log("[Audio] AudioRecord init failed"); Stop(); return false; }
 
@@ -276,16 +289,45 @@ namespace Buds3ProAideAuditiveIA.v2
                 _platFx.AttachOrUpdate(_rec.AudioSessionId, _usePlatformFx, _usePlatformFx, _usePlatformFx);
 
                 // track
-                                _outChannel = (_transport == AudioTransport.A2DP) ? ChannelOut.Stereo : ChannelOut.Mono;
+                _outChannel = (_transport == AudioTransport.A2DP) ? ChannelOut.Stereo : ChannelOut.Mono;
                 _isStereoOut = _outChannel == ChannelOut.Stereo;
                 int minTrk = AudioTrack.GetMinBufferSize(_fs, _outChannel, Encoding.Pcm16bit);
                 _trkBufBytes = Math.Max(minTrk, _n * 4);
 
+                if (_transport == AudioTransport.SCO && Android.OS.Build.VERSION.SdkInt >= Android.OS.BuildVersionCodes.Lollipop)
+                {
+                    // AudioAttributes pour VOICE_CALL afin d'éviter la sortie haut-parleur
+                    var attrs = new AudioAttributes.Builder()
+                        .SetUsage(AudioUsageKind.VoiceCommunication)
+                        .SetContentType(AudioContentType.Speech)
+                        .Build();
+
+                    var fmt = new AudioFormat.Builder()
+                        .SetSampleRate(_fs)
+                        .SetEncoding(Encoding.Pcm16bit)
+                        .SetChannelMask(_outChannel)
+                        .Build();
+
+                    _trk = new AudioTrack.Builder()
+                        .SetAudioAttributes(attrs)
+                        .SetAudioFormat(fmt)
+                        .SetBufferSizeInBytes(_trkBufBytes)
+                        .SetTransferMode(AudioTrackMode.Stream)
+                        .Build();
+                }
+                else
+                {
 #pragma warning disable CS0618
-                var stream = (_transport == AudioTransport.SCO) ? Stream.VoiceCall : Stream.Music;
-                _trk = new AudioTrack(stream, _fs, _outChannel, Encoding.Pcm16bit, _trkBufBytes, AudioTrackMode.Stream);
+                    var stream = (_transport == AudioTransport.SCO) ? Stream.VoiceCall : Stream.Music;
+                    _trk = new AudioTrack(stream, _fs, _outChannel, Encoding.Pcm16bit, _trkBufBytes, AudioTrackMode.Stream);
 #pragma warning restore CS0618
+                }
+
                 if (_trk.State != AudioTrackState.Initialized) { _log.Log("[Audio] AudioTrack init failed"); Stop(); return false; }
+
+                // Bind explicite vers le device SCO si possible
+                try { BluetoothRouting_Utilities.BindRecordToBtSco(_rec, _ctx); } catch { }
+                try { BluetoothRouting_Utilities.BindTrackToBtSco(_trk, _ctx); } catch { }
 
                 _rec.StartRecording();
                 _trk.Play();
@@ -322,11 +364,12 @@ namespace Buds3ProAideAuditiveIA.v2
 
             try { _platFx.Detach(); } catch { }
 
-            // Only leave comm mode / stop SCO if we were in SCO
+            // Always return to normal mode (safe) — StopSco called inside LeaveCommunicationMode
             try
             {
                 try { BluetoothRouting_Utilities.LeaveCommunicationMode(_ctx); } catch { }
-            } catch { }
+            }
+            catch { }
 
             _log.Log("[Audio] STOP ◼"); try { LogUtilities.Log(_ctx, "AUDIO", "STOP"); } catch { }
         }
@@ -348,7 +391,7 @@ namespace Buds3ProAideAuditiveIA.v2
                 if (_passThrough)
                 {
                     ApplyGain(frame, r, _gainDb);
-                                        if (_isStereoOut) { var st = new short[r*2]; for (int i=0,j=0;i<r;i++){ short s=frame[i]; st[j++]=s; st[j++]=s; } _trk.Write(st, 0, st.Length); }
+                    if (_isStereoOut) { var st = new short[r*2]; for (int i=0,j=0;i<r;i++){ short s=frame[i]; st[j++]=s; st[j++]=s; } _trk.Write(st, 0, st.Length); }
                     else _trk.Write(frame, 0, r);
                     PushMeters(frame, r, 0f);
                     continue;
@@ -379,7 +422,7 @@ namespace Buds3ProAideAuditiveIA.v2
                 // 5) Gain final
                 ApplyGain(frame, r, _gainDb);
 
-                                if (_isStereoOut) { var st = new short[r*2]; for (int i=0,j=0;i<r;i++){ short s=frame[i]; st[j++]=s; st[j++]=s; } _trk.Write(st, 0, st.Length);} else { _trk.Write(frame, 0, r);} 
+                if (_isStereoOut) { var st = new short[r*2]; for (int i=0,j=0;i<r;i++){ short s=frame[i]; st[j++]=s; st[j++]=s; } _trk.Write(st, 0, st.Length);} else { _trk.Write(frame, 0, r);} 
                 PushMeters(frame, r, grDb);
             }
         }

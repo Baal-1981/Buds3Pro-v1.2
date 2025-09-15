@@ -502,7 +502,8 @@ namespace Buds3ProAideAuditiveIA.v2
                 if (_rbSco != null && _rbSco.Checked && !BluetoothRouting_Utilities.IsScoOn(this))
                 {
                     // tentative de reconnexion légère
-                    BluetoothRouting_Utilities.EnsureSco(this, 1500);
+                    BluetoothRouting_Utilities.EnsureSco(this, 2000);
+                    BluetoothRouting_Utilities.ForceCommunicationDeviceSco(this);
                     UpdateRouteLabel();
                 }
 

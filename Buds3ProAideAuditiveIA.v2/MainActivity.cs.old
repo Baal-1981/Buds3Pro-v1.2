@@ -268,9 +268,9 @@ namespace Buds3ProAideAuditiveIA.v2
 
             var rg = new RadioGroup(this) { Orientation = Android.Widget.Orientation.Vertical };
 
-            _rbA2dp = new RadioButton(this) { Text = "A2DP / Media (Music stream)", Checked = true };
-            _rbSco = new RadioButton(this) { Text = "SCO / HFP (Voice call stream)" };
-            _rbLc3Auto = new RadioButton(this) { Text = "LE Audio (LC3) — auto (system decides)", Checked = false };
+            _rbA2dp = new RadioButton(this) { Text = "A2DP / Media (Music stream)", Checked = true }; _rbA2dp.Id = View.GenerateViewId();
+            _rbSco = new RadioButton(this) { Text = "SCO / HFP (Voice call stream)" }; _rbSco.Id = View.GenerateViewId();
+            _rbLc3Auto = new RadioButton(this) { Text = "LE Audio (LC3) — auto (system decides)", Checked = false }; _rbLc3Auto.Id = View.GenerateViewId();
 
             rg.AddView(_rbA2dp);
             rg.AddView(_rbSco);
@@ -392,8 +392,8 @@ namespace Buds3ProAideAuditiveIA.v2
 
             // Choix base 50 / 60 Hz (uniquement si activé)
             var humRow = new LinearLayout(this) { Orientation = Android.Widget.Orientation.Horizontal };
-            var rb50 = new RadioButton(this) { Text = "50 Hz", Checked = true };
-            var rb60 = new RadioButton(this) { Text = "60 Hz" };
+            var rb50 = new RadioButton(this) { Text = "50 Hz", Checked = true }; rb50.Id = View.GenerateViewId();
+            var rb60 = new RadioButton(this) { Text = "60 Hz" }; rb60.Id = View.GenerateViewId();
             var rg = new RadioGroup(this) { Orientation = Android.Widget.Orientation.Horizontal };
             rg.AddView(rb50); rg.AddView(rb60);
             humRow.AddView(rg);
@@ -447,7 +447,8 @@ namespace Buds3ProAideAuditiveIA.v2
 
             var ok = _engine.Start();
             SetStatus(ok ? "RUN ▶ Audio démarré" : "Start FAILED");
-            try { _latency.Text = $"Latency: {_engine.TransportLatencyMs} ms"; } catch { }
+            try { _latency.Text = $"Latency: {_engine.TransportLatencyMs} ms • Route: " + BluetoothRouting_Utilities.GetActiveRouteInfo(this); } catch { }
+            LogUtilities.LogLatency(this, _engine.TransportLatencyMs, _engine.AlgoLatencyMs);
             UpdateRouteLabel();
         }
 
@@ -471,8 +472,14 @@ namespace Buds3ProAideAuditiveIA.v2
             {
                 var info = BluetoothRouting_Utilities.GetActiveRouteInfo(this);
                 _routeInfo.Text = "Sortie: " + info;
+                try { _latency.Text = $"Latency: {_engine.TransportLatencyMs} ms • Route: {info}"; } catch { }
+                LogUtilities.Log(this, "ROUTE", info);
             }
-            catch { _routeInfo.Text = "Sortie: (unknown)"; }
+            catch
+            {
+                _routeInfo.Text = "Sortie: (unknown)";
+                try { _latency.Text = $"Latency: {_engine.TransportLatencyMs} ms • Route: (unknown)"; } catch { }
+            }
         }
 
         private void RebindTransport()
@@ -600,6 +607,7 @@ namespace Buds3ProAideAuditiveIA.v2
                 try
                 {
                     _status.Text = msg;
+                    LogUtilities.Log(this, "APP", msg);
                 }
                 catch { }
             });

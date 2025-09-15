@@ -43,51 +43,25 @@ namespace Buds3ProAideAuditiveIA.v2
             catch { }
         }
 
-        /// <summary>Active SCO et attend CONNECTED via broadcast (jusqu’à timeoutMs). Retourne true si SCO est actif.</summary>
-        public static bool EnsureSco(Context ctx, int timeoutMs = 4000)
+        /// <summary>Active SCO et attend jusqu’à <paramref name="timeoutMs"/> ms. Retourne true si SCO est actif.</summary>
+        public static bool EnsureSco(Context ctx, int timeoutMs = 3000)
         {
             var am = AM(ctx);
             try
             {
-                // Toujours en mode InCommunication AVANT de démarrer le SCO
-                try { am.Mode = Mode.InCommunication; } catch { }
-                try { am.SpeakerphoneOn = false; } catch { }
-
                 if (am.BluetoothScoOn) return true;
-
-                bool connected = false;
-                BroadcastReceiver br = null;
-                try
-                {
-                    // Receiver pour l’état SCO
-#pragma warning disable CS0618
-                    br = new ScoStateReceiver(() => connected = true);
-                    ctx.RegisterReceiver(br, new IntentFilter(AudioManager.ActionScoAudioStateUpdated));
-#pragma warning restore CS0618
-                }
-                catch { /* best effort */ }
-
-                try
-                {
-                    am.StartBluetoothSco();
-                    am.BluetoothScoOn = true;
-                }
-                catch { }
-
-                var t0 = Java.Lang.JavaSystem.CurrentTimeMillis();
-                while (Java.Lang.JavaSystem.CurrentTimeMillis() - t0 < timeoutMs)
-                {
-                    if (connected || IsScoOn(ctx)) break;
-                    try { System.Threading.Thread.Sleep(50); } catch { }
-                }
-
-                try { if (br != null) ctx.UnregisterReceiver(br); } catch { }
-                return IsScoOn(ctx);
+                am.StartBluetoothSco();
+                am.BluetoothScoOn = true;
             }
-            catch
+            catch { }
+
+            var t0 = Java.Lang.JavaSystem.CurrentTimeMillis();
+            while (Java.Lang.JavaSystem.CurrentTimeMillis() - t0 < timeoutMs)
             {
-                return false;
+                if (IsScoOn(ctx)) return true;
+                try { System.Threading.Thread.Sleep(50); } catch { }
             }
+            return IsScoOn(ctx);
         }
 
         public static void StopSco(Context ctx)
@@ -212,46 +186,6 @@ namespace Buds3ProAideAuditiveIA.v2
                 }
             }
             catch { }
-        }
-
-        /// <summary>API 31+: force le device de communication vers le casque SCO s'il est présent.</summary>
-        public static void ForceCommunicationDeviceSco(Context ctx)
-        {
-            try
-            {
-                if (Build.VERSION.SdkInt < BuildVersionCodes.S) return;
-                var am = AM(ctx);
-                var outs = am.GetDevices(GetDevicesTargets.Outputs);
-                var sco = outs.FirstOrDefault(d => d?.Type == AudioDeviceType.BluetoothSco);
-                if (sco != null)
-                {
-                    try { am.SetCommunicationDevice(sco); } catch { }
-                }
-            }
-            catch { }
-        }
-
-        private sealed class ScoStateReceiver : BroadcastReceiver
-        {
-            private readonly Action _onConnected;
-            public ScoStateReceiver(Action onConnected) { _onConnected = onConnected; }
-
-            public override void OnReceive(Context context, Intent intent)
-            {
-                if (intent == null) return;
-#pragma warning disable CS0618
-                if (intent.Action == AudioManager.ActionScoAudioStateUpdated)
-                {
-                    // ⚠️ Correction: utiliser l'enum ScoAudioState, pas les constantes AudioManager.* obsolètes
-                    var state = (ScoAudioState)intent.GetIntExtra(
-                        AudioManager.ExtraScoAudioState,
-                        (int)ScoAudioState.Disconnected);
-
-                    if (state == ScoAudioState.Connected)
-                        _onConnected?.Invoke();
-                }
-#pragma warning restore CS0618
-            }
         }
     }
 }

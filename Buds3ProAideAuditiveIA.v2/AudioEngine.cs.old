@@ -63,6 +63,7 @@ namespace Buds3ProAideAuditiveIA.v2
 
         // gain global
         private int _gainDb = 0;
+        private double _gainMultiplier = 1.0;
 
         // calib NR spectral
         private volatile int _calibFrames = 0;
@@ -77,6 +78,56 @@ namespace Buds3ProAideAuditiveIA.v2
 
         public bool IsRunning => _running;
 
+        // === Health / Monitoring ===
+        public struct AudioHealthMetrics
+        {
+            public int BufferUnderrunsCount;
+            public int LatencyMs;
+            public int CpuUsagePercent;
+        }
+
+        public AudioHealthMetrics GetHealthMetrics()
+        {
+            int underruns = -1;
+            try { underruns = _trk?.UnderrunCount ?? -1; } catch { }
+            return new AudioHealthMetrics
+            {
+                BufferUnderrunsCount = underruns,
+                LatencyMs = EstimatedLatencyMs,
+                CpuUsagePercent = -1 // TODO: hook if needed
+            };
+        }
+
+        public enum AudioPreset { Default, Restaurant, Office, Outdoor }
+
+        public void ApplyPreset(AudioPreset preset)
+        {
+            switch (preset)
+            {
+                case AudioPreset.Restaurant:
+                    SetAmbientReductionDb(18);
+                    SetPresenceDb(6);
+                    SetEqEnabled(true);
+                    break;
+                case AudioPreset.Office:
+                    SetAmbientReductionDb(8);
+                    SetPresenceDb(2);
+                    SetEqEnabled(false);
+                    break;
+                case AudioPreset.Outdoor:
+                    SetAmbientReductionDb(22);
+                    SetPresenceDb(4);
+                    SetEqEnabled(true);
+                    break;
+                case AudioPreset.Default:
+                default:
+                    SetAmbientReductionDb(12);
+                    SetPresenceDb(0);
+                    SetEqEnabled(false);
+                    break;
+            }
+        }
+
         public AudioEngine(Context ctx, ILogSink log = null)
         {
             _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
@@ -86,7 +137,7 @@ namespace Buds3ProAideAuditiveIA.v2
         public void SetTransport(AudioTransport t)
         {
             _transport = t;
-            _log.Log($"[Route] Transport set to {t}");
+            _log.Log($"[Route] Transport set to {t}"); try { LogUtilities.Log(_ctx, "ROUTE", $"Transport set to {t}"); } catch { }
         }
 
         // ================== configuration ==================
@@ -160,7 +211,7 @@ namespace Buds3ProAideAuditiveIA.v2
         public void SetAmbientReleaseMs(int ms) { _ambRelMs = Clamp(ms, 50, 300); /* hook à raffiner si besoin */ }
 
         // Gain
-        public void SetGainDb(int db) { _gainDb = Clamp(db, 0, 36); }
+        public void SetGainDb(int db) { _gainDb = Clamp(db, 0, 36); _gainMultiplier = Math.Pow(10.0, _gainDb / 20.0); }
 
         // EQ + présence
         public void SetEqEnabled(bool on) { _useEq = on; _eq?.SetEnabled(on); }
@@ -245,7 +296,7 @@ namespace Buds3ProAideAuditiveIA.v2
                 _worker = new Thread(Loop) { IsBackground = true, Name = "AudioEngineLoop" };
                 _worker.Start();
 
-                _log.Log($"[Audio] RUN ▶ fs={_fs} frame={_n} samples recBuf={_recBufBytes} trkBuf={_trkBufBytes} transport={_transport}");
+                _log.Log($"[Audio] RUN ▶ fs={_fs} frame={_n} samples recBuf={_recBufBytes} trkBuf={_trkBufBytes} transport={_transport}"); try { LogUtilities.LogLatency(_ctx, TransportLatencyMs, AlgoLatencyMs); LogUtilities.LogRoute(_ctx, BluetoothRouting_Utilities.GetActiveRouteInfo(_ctx)); } catch { }
                 return true;
             }
             catch (Exception ex)
@@ -277,7 +328,7 @@ namespace Buds3ProAideAuditiveIA.v2
                 try { BluetoothRouting_Utilities.LeaveCommunicationMode(_ctx); } catch { }
             } catch { }
 
-            _log.Log("[Audio] STOP ◼");
+            _log.Log("[Audio] STOP ◼"); try { LogUtilities.Log(_ctx, "AUDIO", "STOP"); } catch { }
         }
 
         // ================== boucle DSP ==================
@@ -333,10 +384,10 @@ namespace Buds3ProAideAuditiveIA.v2
             }
         }
 
-        private static void ApplyGain(short[] buf, int len, int gainDb)
+        private void ApplyGain(short[] buf, int len, int gainDb)
         {
             if (gainDb == 0) return;
-            double g = Math.Pow(10.0, gainDb / 20.0);
+            double g = _gainMultiplier;
             for (int i = 0; i < len; i++)
             {
                 int v = (int)Math.Round(buf[i] * g);
