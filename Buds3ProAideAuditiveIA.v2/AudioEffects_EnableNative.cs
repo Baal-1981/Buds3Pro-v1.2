@@ -13,49 +13,112 @@ namespace Buds3ProAideAuditiveIA.v2
         public bool NsActive { get; private set; }
         public bool AgcActive { get; private set; }
 
-        AcousticEchoCanceler _aec;
-        NoiseSuppressor _ns;
-        AutomaticGainControl _agc;
-        int _sessionId = -1;
+        public int SessionId => _sessionId;
+
+        private AcousticEchoCanceler _aec;
+        private NoiseSuppressor _ns;
+        private AutomaticGainControl _agc;
+        private int _sessionId = -1;
 
         public static bool IsAecAvailable => AcousticEchoCanceler.IsAvailable;
         public static bool IsNsAvailable => NoiseSuppressor.IsAvailable;
         public static bool IsAgcAvailable => AutomaticGainControl.IsAvailable;
 
-        public void AttachToInputSession(int audioSessionId, bool wantAec, bool wantNs, bool wantAgc)
+        public void AttachOrUpdate(int audioSessionId, bool wantAec, bool wantNs, bool wantAgc)
         {
-            Detach();
-            _sessionId = audioSessionId;
+            if (audioSessionId <= 0)
+            {
+                Detach();
+                return;
+            }
+
+            if (_sessionId != audioSessionId)
+            {
+                Detach();
+                _sessionId = audioSessionId;
+            }
+
             AecRequested = wantAec; NsRequested = wantNs; AgcRequested = wantAgc;
 
-            if (_sessionId <= 0) return;
-
+            // AEC
             if (wantAec && IsAecAvailable)
             {
-                try { _aec = AcousticEchoCanceler.Create(_sessionId); if (_aec != null) { _aec.SetEnabled(true); AecActive = _aec.Enabled; } }
-                catch { AecActive = false; }
+                if (_aec == null) { try { _aec = AcousticEchoCanceler.Create(_sessionId); } catch { _aec = null; } }
+                TryEnable(_aec, true, out var activeAec);   // IDE0018: inline out var
+                AecActive = activeAec;
             }
+            else
+            {
+                TryEnable(_aec, false, out _);
+                SafeRelease(ref _aec);
+                AecActive = false;
+            }
+
+            // NS
             if (wantNs && IsNsAvailable)
             {
-                try { _ns = NoiseSuppressor.Create(_sessionId); if (_ns != null) { _ns.SetEnabled(true); NsActive = _ns.Enabled; } }
-                catch { NsActive = false; }
+                if (_ns == null) { try { _ns = NoiseSuppressor.Create(_sessionId); } catch { _ns = null; } }
+                TryEnable(_ns, true, out var activeNs);     // IDE0018
+                NsActive = activeNs;
             }
+            else
+            {
+                TryEnable(_ns, false, out _);
+                SafeRelease(ref _ns);
+                NsActive = false;
+            }
+
+            // AGC
             if (wantAgc && IsAgcAvailable)
             {
-                try { _agc = AutomaticGainControl.Create(_sessionId); if (_agc != null) { _agc.SetEnabled(true); AgcActive = _agc.Enabled; } }
-                catch { AgcActive = false; }
+                if (_agc == null) { try { _agc = AutomaticGainControl.Create(_sessionId); } catch { _agc = null; } }
+                TryEnable(_agc, true, out var activeAgc);   // IDE0018
+                AgcActive = activeAgc;
             }
+            else
+            {
+                TryEnable(_agc, false, out _);
+                SafeRelease(ref _agc);
+                AgcActive = false;
+            }
+        }
+
+        public void Update(bool wantAec, bool wantNs, bool wantAgc)
+        {
+            if (_sessionId <= 0) return;
+            AttachOrUpdate(_sessionId, wantAec, wantNs, wantAgc);
         }
 
         public void Detach()
         {
             AecActive = NsActive = AgcActive = false;
-            try { if (_aec != null) { try { _aec.SetEnabled(false); } catch { } _aec.Release(); } } catch { }
-            try { if (_ns != null) { try { _ns.SetEnabled(false); } catch { } _ns.Release(); } } catch { }
-            try { if (_agc != null) { try { _agc.SetEnabled(false); } catch { } _agc.Release(); } } catch { }
-            _aec = null; _ns = null; _agc = null; _sessionId = -1;
+
+            TryEnable(_aec, false, out _);
+            TryEnable(_ns, false, out _);
+            TryEnable(_agc, false, out _);
+
+            SafeRelease(ref _aec);
+            SafeRelease(ref _ns);
+            SafeRelease(ref _agc);
+
+            _sessionId = -1;
         }
 
         public void Dispose() => Detach();
+
+        // ===== Helpers =====
+        private static void SafeRelease<T>(ref T fx) where T : AudioEffect
+        {
+            try { fx?.Release(); } catch { }
+            fx = null;
+        }
+
+        private static void TryEnable(AudioEffect fx, bool on, out bool isOn)
+        {
+            isOn = false;
+            if (fx == null) return;
+            try { fx.SetEnabled(on); } catch { }
+            try { isOn = fx.Enabled; } catch { isOn = false; }
+        }
     }
 }

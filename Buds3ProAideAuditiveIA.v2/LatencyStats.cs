@@ -1,7 +1,7 @@
 ﻿
 using System;
 using System.Collections.Generic;
-namespace Buds3ProAideAuditivelA.v2
+namespace Buds3ProAideAuditiveIA.v2
 {
     public sealed class LatencyStats
     {

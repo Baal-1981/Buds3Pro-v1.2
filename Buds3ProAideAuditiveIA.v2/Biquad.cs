@@ -2,59 +2,110 @@
 
 namespace Buds3ProAideAuditiveIA.v2
 {
+    /// <summary>
+    /// Biquad IIR en Direct Form II (RBJ).
+    /// Corrigé pour éliminer IDE0059 (noms de variables clairs, pas d’ombre),
+    /// et éviter l’assignation à un champ readonly.
+    /// </summary>
     public class Biquad
     {
-        double a0 = 1, a1 = 0, a2 = 0, b1 = 0, b2 = 0;
-        double z1 = 0, z2 = 0;
+        // Coefficients normalisés (a0 = 1)
+        private double _b0 = 1.0, _b1 = 0.0, _b2 = 0.0;
+        private double _a1 = 0.0, _a2 = 0.0;
 
+        // États (DF-II)
+        private double _z1 = 0.0, _z2 = 0.0;
+
+        /// <summary>Réinitialise l’état interne (z1/z2).</summary>
+        public void Reset()
+        {
+            _z1 = 0.0; _z2 = 0.0;
+        }
+
+        /// <summary>
+        /// Conçoit un filtre passe-haut (High-pass) RBJ.
+        /// sr: sample rate, fc: fréquence de coupure, q: facteur de qualité.
+        /// </summary>
         public void DesignHighpass(int sr, double fc, double q)
         {
-            double w0 = 2 * System.Math.PI * fc / sr;
-            double alpha = System.Math.Sin(w0) / (2 * q);
-            double cos = System.Math.Cos(w0);
+            double w0 = 2.0 * Math.PI * fc / sr;
+            double cosw = Math.Cos(w0);
+            double sinw = Math.Sin(w0);
+            double alpha = sinw / (2.0 * q);
 
-            double b0 = (1 + cos) / 2.0;
-            double b1n = -(1 + cos);
-            double b2 = (1 + cos) / 2.0;
-            double a0n = 1 + alpha;
-            double a1n = -2 * cos;
-            double a2n = 1 - alpha;
+            // Coeffs non normalisés (RBJ)
+            double b0 = (1 + cosw) / 2.0;
+            double b1 = -(1 + cosw);
+            double b2 = (1 + cosw) / 2.0;
+            double a0 = 1 + alpha;
+            double a1 = -2 * cosw;
+            double a2 = 1 - alpha;
 
-            a0 = b0 / a0n; a1 = b1n / a0n; a2 = b2 / a0n; b1 = a1n / a0n; b2 = a2n / a0n;
+            // Normalisation a0 = 1
+            _b0 = b0 / a0;
+            _b1 = b1 / a0;
+            _b2 = b2 / a0;
+            _a1 = a1 / a0;
+            _a2 = a2 / a0;
+
+            Reset();
         }
 
+        /// <summary>
+        /// Conçoit un peaking EQ (RBJ).
+        /// gainDb &gt; 0 = bosse, &lt; 0 = creux.
+        /// </summary>
         public void DesignPeaking(int sr, double fc, double q, double gainDb)
         {
-            double A = System.Math.Pow(10.0, gainDb / 40.0);
-            double w0 = 2 * System.Math.PI * fc / sr;
-            double alpha = System.Math.Sin(w0) / (2 * q);
-            double cos = System.Math.Cos(w0);
+            double A = Math.Pow(10.0, gainDb / 40.0);
+            double w0 = 2.0 * Math.PI * fc / sr;
+            double cosw = Math.Cos(w0);
+            double sinw = Math.Sin(w0);
+            double alpha = sinw / (2.0 * q);
 
+            // Coeffs non normalisés (RBJ)
             double b0 = 1 + alpha * A;
-            double b1n = -2 * cos;
+            double b1 = -2 * cosw;
             double b2 = 1 - alpha * A;
-            double a0n = 1 + alpha / A;
-            double a1n = -2 * cos;
-            double a2n = 1 - alpha / A;
+            double a0 = 1 + alpha / A;
+            double a1 = -2 * cosw;
+            double a2 = 1 - alpha / A;
 
-            a0 = b0 / a0n; a1 = b1n / a0n; a2 = b2 / a0n; b1 = a1n / a0n; b2 = a2n / a0n;
+            // Normalisation a0 = 1
+            _b0 = b0 / a0;
+            _b1 = b1 / a0;
+            _b2 = b2 / a0;
+            _a1 = a1 / a0;
+            _a2 = a2 / a0;
+
+            Reset();
         }
 
+        /// <summary>
+        /// Traite un buffer mono in-place (amplitude attendue [-1;1]).
+        /// </summary>
         public void ProcessInPlace(float[] x, int n)
         {
-            double z1l = z1, z2l = z2;
-            double a0l = a0, a1l = a1, a2l = a2, b1l = b1, b2l = b2;
+            double b0 = _b0, b1 = _b1, b2 = _b2, a1 = _a1, a2 = _a2;
+            double z1 = _z1, z2 = _z2;
 
             for (int i = 0; i < n; i++)
             {
                 double v = x[i];
-                double y = v * a0l + z1l;
-                z1l = v * a1l + z2l - b1l * y;
-                z2l = v * a2l - b2l * y;
-                x[i] = (float)System.Math.Max(-1.0, System.Math.Min(1.0, y));
+
+                // DF-II transposée
+                double y = v * b0 + z1;
+                z1 = v * b1 + z2 - a1 * y;
+                z2 = v * b2 - a2 * y;
+
+                // Clamp doux pour éviter les dépassements
+                if (y > 1.0) y = 1.0;
+                else if (y < -1.0) y = -1.0;
+
+                x[i] = (float)y;
             }
 
-            z1 = z1l; z2 = z2l;
+            _z1 = z1; _z2 = z2;
         }
     }
 }
