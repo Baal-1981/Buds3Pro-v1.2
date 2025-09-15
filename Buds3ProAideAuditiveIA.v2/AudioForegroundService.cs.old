@@ -1,0 +1,77 @@
+using Android.App;
+using Android.Content;
+using Android.OS;
+using Android.Content.PM;      // ForegroundService.Type*
+using AndroidX.Core.App;
+
+namespace Buds3ProAideAuditiveIA.v2
+{
+    [Service(
+        Exported = true,
+        ForegroundServiceType =
+            ForegroundService.TypeMediaPlayback |
+            ForegroundService.TypeMicrophone
+    )]
+    public class AudioForegroundService : Service
+    {
+        public const string ACTION_START = "sonara.service.START";
+        public const string ACTION_STOP = "sonara.service.STOP";
+
+        private const string CHANNEL_ID = "sonara_audio";
+        private const int NOTIF_ID = 0xA11D;
+
+        public override void OnCreate()
+        {
+            base.OnCreate();
+
+            if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
+            {
+                var nm = (NotificationManager)GetSystemService(NotificationService);
+                var ch = new NotificationChannel(CHANNEL_ID, "Sonara Audio", NotificationImportance.Low)
+                {
+                    Description = "Maintient l'audio en arrière-plan"
+                };
+                nm.CreateNotificationChannel(ch);
+            }
+        }
+
+        public override StartCommandResult OnStartCommand(Intent intent, StartCommandFlags flags, int startId)
+        {
+            var action = intent?.Action;
+
+            if (action == ACTION_START)
+            {
+                var notif = new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .SetContentTitle("Sonara")
+                    .SetContentText("Audio en arrière-plan")
+                    .SetSmallIcon(Android.Resource.Drawable.StatSysHeadset)
+                    .SetOngoing(true)
+                    .SetOnlyAlertOnce(true)
+                    .Build();
+
+                StartForeground(NOTIF_ID, notif);
+            }
+            else if (action == ACTION_STOP)
+            {
+                // API 24+ : nouvelle API avec flags
+                if (Build.VERSION.SdkInt >= BuildVersionCodes.N)
+                {
+                    StopForeground(StopForegroundFlags.Remove);
+                }
+                else
+                {
+                    // API < 24 : seul StopForeground(bool) existe ; on supprime le warning CS0618.
+#pragma warning disable CS0618
+                    StopForeground(true);
+#pragma warning restore CS0618
+                }
+
+                StopSelf();
+            }
+
+            return StartCommandResult.Sticky;
+        }
+
+        public override IBinder OnBind(Intent intent) => null;
+    }
+}

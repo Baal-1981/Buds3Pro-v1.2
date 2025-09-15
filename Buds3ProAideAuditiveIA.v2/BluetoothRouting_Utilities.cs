@@ -1,9 +1,9 @@
+using System;
+using System.Linq;
 using Android.Content;
 using Android.Media;
 using Android.OS;
 using Android.Runtime;
-using System;
-using System.Linq;
 
 namespace Buds3ProAideAuditiveIA.v2
 {
@@ -27,7 +27,8 @@ namespace Buds3ProAideAuditiveIA.v2
                 am.Mode = Mode.InCommunication;
                 am.SpeakerphoneOn = false;
                 am.MicrophoneMute = false;
-            } catch { }
+            }
+            catch { }
         }
 
         public static void LeaveCommunicationMode(Context ctx)
@@ -38,10 +39,11 @@ namespace Buds3ProAideAuditiveIA.v2
                 try { StopSco(ctx); } catch { }
                 am.Mode = Mode.Normal;
                 am.SpeakerphoneOn = false;
-            } catch { }
+            }
+            catch { }
         }
 
-        /// <summary>Essayez d'activer SCO et attendez brièvement. Retourne true si SCO est actif.</summary>
+        /// <summary>Active SCO et attend jusqu’à <paramref name="timeoutMs"/> ms. Retourne true si SCO est actif.</summary>
         public static bool EnsureSco(Context ctx, int timeoutMs = 3000)
         {
             var am = AM(ctx);
@@ -50,7 +52,8 @@ namespace Buds3ProAideAuditiveIA.v2
                 if (am.BluetoothScoOn) return true;
                 am.StartBluetoothSco();
                 am.BluetoothScoOn = true;
-            } catch { }
+            }
+            catch { }
 
             var t0 = Java.Lang.JavaSystem.CurrentTimeMillis();
             while (Java.Lang.JavaSystem.CurrentTimeMillis() - t0 < timeoutMs)
@@ -72,16 +75,20 @@ namespace Buds3ProAideAuditiveIA.v2
             try { return AM(ctx).BluetoothScoOn; } catch { return false; }
         }
 
-        // ====== Device insight / LE-Audio vs A2DP ======
+        // ====== Infos route / LE-Audio vs A2DP ======
         public static string GetActiveRouteInfo(Context ctx)
         {
             try
             {
-                var am = AM(ctx);
-                var outs = am.GetDevices(GetDevicesTargets.Outputs);
-                bool hasBle = outs.Any(d => d.Type == AudioDeviceType.BleHeadset || d.Type == AudioDeviceType.BleSpeaker || d.Type == AudioDeviceType.BleBroadcast);
-                bool hasA2dp = outs.Any(d => d.Type == AudioDeviceType.BluetoothA2dp || d.Type == AudioDeviceType.BluetoothSco);
+                var outs = AM(ctx).GetDevices(GetDevicesTargets.Outputs);
                 bool sco = IsScoOn(ctx);
+                bool hasBle = outs.Any(d =>
+                    d.Type == AudioDeviceType.BleHeadset ||
+                    d.Type == AudioDeviceType.BleSpeaker ||
+                    d.Type == AudioDeviceType.BleBroadcast);
+                bool hasA2dp = outs.Any(d =>
+                    d.Type == AudioDeviceType.BluetoothA2dp ||
+                    d.Type == AudioDeviceType.BluetoothSco);
 
                 if (sco) return "SCO (HFP/VoiceCall)";
                 if (hasBle) return "LE (LC3) — auto";
@@ -96,7 +103,10 @@ namespace Buds3ProAideAuditiveIA.v2
             try
             {
                 var outs = AM(ctx).GetDevices(GetDevicesTargets.Outputs);
-                return outs.Any(d => d.Type == AudioDeviceType.BleHeadset || d.Type == AudioDeviceType.BleSpeaker || d.Type == AudioDeviceType.BleBroadcast);
+                return outs.Any(d =>
+                    d.Type == AudioDeviceType.BleHeadset ||
+                    d.Type == AudioDeviceType.BleSpeaker ||
+                    d.Type == AudioDeviceType.BleBroadcast);
             }
             catch { return false; }
         }
@@ -107,7 +117,8 @@ namespace Buds3ProAideAuditiveIA.v2
             {
                 var outs = AM(ctx).GetDevices(GetDevicesTargets.Outputs);
                 return outs.Any(d => d.Type == AudioDeviceType.BluetoothA2dp);
-            } catch { return false; }
+            }
+            catch { return false; }
         }
 
         // ====== Device callbacks ======
@@ -118,7 +129,8 @@ namespace Buds3ProAideAuditiveIA.v2
             {
                 _callbackCached = cb;
                 AM(ctx).RegisterAudioDeviceCallback(cb, null);
-            } catch { }
+            }
+            catch { }
         }
 
         public static void UnregisterDeviceCallback(Context ctx, AudioDeviceCallback cb)
@@ -127,7 +139,53 @@ namespace Buds3ProAideAuditiveIA.v2
             {
                 var am = AM(ctx);
                 am.UnregisterAudioDeviceCallback(cb ?? _callbackCached);
-            } catch { }
+            }
+            catch { }
+        }
+
+        // ====== Helpers de binding explicite (API >= 23) ======
+        public static void BindRecordToBtSco(AudioRecord rec, Context ctx = null)
+        {
+            if (rec == null || Build.VERSION.SdkInt < BuildVersionCodes.M) return;
+            try
+            {
+                var am = ctx != null
+                    ? AM(ctx)
+                    : (AudioManager)Android.App.Application.Context.GetSystemService(Context.AudioService);
+
+                // Pour l'entrée, inspecter les INPUTS
+                var inputs = am?.GetDevices(GetDevicesTargets.Inputs);
+                var scoIn = inputs?.FirstOrDefault(d => d?.Type == AudioDeviceType.BluetoothSco)
+                            ?? am?.GetDevices(GetDevicesTargets.All)?.FirstOrDefault(d => d?.Type == AudioDeviceType.BluetoothSco);
+
+                if (scoIn != null)
+                {
+                    try { rec.SetPreferredDevice(scoIn); } catch { }
+                }
+            }
+            catch { }
+        }
+
+        public static void BindTrackToBtSco(AudioTrack trk, Context ctx = null)
+        {
+            if (trk == null || Build.VERSION.SdkInt < BuildVersionCodes.M) return;
+            try
+            {
+                var am = ctx != null
+                    ? AM(ctx)
+                    : (AudioManager)Android.App.Application.Context.GetSystemService(Context.AudioService);
+
+                // Pour la sortie, inspecter les OUTPUTS
+                var outs = am?.GetDevices(GetDevicesTargets.Outputs);
+                var target = outs?.FirstOrDefault(d => d?.Type == AudioDeviceType.BluetoothSco)
+                             ?? outs?.FirstOrDefault(d => d?.Type == AudioDeviceType.BluetoothA2dp); // fallback
+
+                if (target != null)
+                {
+                    try { trk.SetPreferredDevice(target); } catch { }
+                }
+            }
+            catch { }
         }
     }
 }
