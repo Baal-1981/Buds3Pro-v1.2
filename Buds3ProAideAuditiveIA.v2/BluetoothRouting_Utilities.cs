@@ -3,7 +3,6 @@ using System.Linq;
 using Android.Content;
 using Android.Media;
 using Android.OS;
-using Android.Runtime;
 
 namespace Buds3ProAideAuditiveIA.v2
 {
@@ -57,13 +56,12 @@ namespace Buds3ProAideAuditiveIA.v2
 
                 bool connected = false;
                 BroadcastReceiver br = null;
+
                 try
                 {
-                    // Receiver pour l’état SCO
-#pragma warning disable CS0618
+                    // Receiver pour l’état SCO (on évite les constantes obsolètes)
                     br = new ScoStateReceiver(() => connected = true);
                     ctx.RegisterReceiver(br, new IntentFilter(AudioManager.ActionScoAudioStateUpdated));
-#pragma warning restore CS0618
                 }
                 catch { /* best effort */ }
 
@@ -239,10 +237,10 @@ namespace Buds3ProAideAuditiveIA.v2
             public override void OnReceive(Context context, Intent intent)
             {
                 if (intent == null) return;
-#pragma warning disable CS0618
+
                 if (intent.Action == AudioManager.ActionScoAudioStateUpdated)
                 {
-                    // ⚠️ Correction: utiliser l'enum ScoAudioState, pas les constantes AudioManager.* obsolètes
+                    // Utiliser l'enum ScoAudioState (pas les constantes obsolètes)
                     var state = (ScoAudioState)intent.GetIntExtra(
                         AudioManager.ExtraScoAudioState,
                         (int)ScoAudioState.Disconnected);
@@ -250,7 +248,6 @@ namespace Buds3ProAideAuditiveIA.v2
                     if (state == ScoAudioState.Connected)
                         _onConnected?.Invoke();
                 }
-#pragma warning restore CS0618
             }
         }
     }
