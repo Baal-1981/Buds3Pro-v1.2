@@ -42,13 +42,13 @@ namespace Buds3ProAideAuditiveIA.v2
             catch { }
         }
 
-        /// <summary>Active SCO et attend CONNECTED via broadcast (jusqu’à timeoutMs). Retourne true si SCO est actif.</summary>
+        /// <summary>Active SCO et attend CONNECTED via broadcast (jusquâ€™Ã  timeoutMs). Retourne true si SCO est actif.</summary>
         public static bool EnsureSco(Context ctx, int timeoutMs = 4000)
         {
             var am = AM(ctx);
             try
             {
-                // Toujours en mode InCommunication AVANT de démarrer le SCO
+                // Toujours en mode InCommunication AVANT de dÃ©marrer le SCO
                 try { am.Mode = Mode.InCommunication; } catch { }
                 try { am.SpeakerphoneOn = false; } catch { }
 
@@ -59,7 +59,7 @@ namespace Buds3ProAideAuditiveIA.v2
 
                 try
                 {
-                    // Receiver pour l’état SCO (on évite les constantes obsolètes)
+                    // Receiver pour lâ€™Ã©tat SCO (on Ã©vite les constantes obsolÃ¨tes)
                     br = new ScoStateReceiver(() => connected = true);
                     ctx.RegisterReceiver(br, new IntentFilter(AudioManager.ActionScoAudioStateUpdated));
                 }
@@ -115,7 +115,7 @@ namespace Buds3ProAideAuditiveIA.v2
                     d.Type == AudioDeviceType.BluetoothSco);
 
                 if (sco) return "SCO (HFP/VoiceCall)";
-                if (hasBle) return "LE (LC3) — auto";
+                if (hasBle) return "LE (LC3) â€” auto";
                 if (hasA2dp) return "A2DP (Media)";
                 return "Device speaker";
             }
@@ -177,7 +177,7 @@ namespace Buds3ProAideAuditiveIA.v2
                     ? AM(ctx)
                     : (AudioManager)Android.App.Application.Context.GetSystemService(Context.AudioService);
 
-                // Pour l'entrée, inspecter les INPUTS
+                // Pour l'entrÃ©e, inspecter les INPUTS
                 var inputs = am?.GetDevices(GetDevicesTargets.Inputs);
                 var scoIn = inputs?.FirstOrDefault(d => d?.Type == AudioDeviceType.BluetoothSco)
                             ?? am?.GetDevices(GetDevicesTargets.All)?.FirstOrDefault(d => d?.Type == AudioDeviceType.BluetoothSco);
@@ -212,7 +212,7 @@ namespace Buds3ProAideAuditiveIA.v2
             catch { }
         }
 
-        /// <summary>API 31+: force le device de communication vers le casque SCO s'il est présent.</summary>
+        /// <summary>API 31+: force le device de communication vers le casque SCO s'il est prÃ©sent.</summary>
         public static void ForceCommunicationDeviceSco(Context ctx)
         {
             try
@@ -240,7 +240,7 @@ namespace Buds3ProAideAuditiveIA.v2
 
                 if (intent.Action == AudioManager.ActionScoAudioStateUpdated)
                 {
-                    // Utiliser l'enum ScoAudioState (pas les constantes obsolètes)
+                    // Utiliser l'enum ScoAudioState (pas les constantes obsolÃ¨tes)
                     var state = (ScoAudioState)intent.GetIntExtra(
                         AudioManager.ExtraScoAudioState,
                         (int)ScoAudioState.Disconnected);

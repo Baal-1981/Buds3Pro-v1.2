@@ -13,7 +13,7 @@ namespace Buds3ProAideAuditiveIA.v2
     ///   - Reconfigure(int sampleRate), Reset()
     ///   - ProcessBuffer(short[] buf, int count)
     /// </summary>
-    public sealed class Equalizer3Band
+    public sealed class Equalizer3Band : IDisposable
     {
         private int _fs;
 
@@ -34,6 +34,9 @@ namespace Buds3ProAideAuditiveIA.v2
         private readonly BiquadSec _low = new BiquadSec();
         private readonly BiquadSec _mid = new BiquadSec();
         private readonly BiquadSec _high = new BiquadSec();
+
+        // Disposition flag
+        private bool _disposed = false;
 
         public Equalizer3Band(int sampleRate) => Reconfigure(sampleRate);
 
@@ -113,6 +116,27 @@ namespace Buds3ProAideAuditiveIA.v2
 
         private static int Clamp(int v, int lo, int hi) => v < lo ? lo : (v > hi ? hi : v);
         private static float Clamp(float v, float lo, float hi) => v < lo ? lo : (v > hi ? hi : v);
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        private void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
+            {
+                // Cleanup managed resources
+                _low?.Reset();
+                _mid?.Reset();
+                _high?.Reset();
+            }
+
+            _disposed = true;
+        }
 
         // ====== Section biquad RBJ (coeffs normalisés, a0=1), DF-II transposée ======
         private sealed class BiquadSec

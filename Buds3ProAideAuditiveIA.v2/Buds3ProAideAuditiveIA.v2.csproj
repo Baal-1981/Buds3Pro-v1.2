@@ -83,25 +83,34 @@
     <Reference Include="System.Numerics.Vectors" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AccessibleUIComponents.cs" />
     <Compile Include="ApmWrapper.cs" />
     <Compile Include="AppControlReceiver.cs" />
     <Compile Include="AudioEffects_EnableNative.cs" />
     <Compile Include="AudioEngine.cs" />
     <Compile Include="AudioForegroundService.cs" />
+    <Compile Include="AutoFallbackConfig.cs" />
     <Compile Include="Biquad.cs" />
+    <Compile Include="BluetoothManager.cs" />
     <Compile Include="BluetoothRouting_Utilities.cs" />
     <Compile Include="Compressor.cs" />
+    <Compile Include="ConnectionQualityMonitor.cs" />
+    <Compile Include="DeviceProfileManager.cs" />
     <Compile Include="DspChain.cs" />
     <Compile Include="Equalizer.cs" />
     <Compile Include="Filters.cs" />
     <Compile Include="HelpActivity.cs" />
+    <Compile Include="InteropExtensions.cs" />
     <Compile Include="LatencyMeter.cs" />
+    <Compile Include="LatencyProfile.cs" />
     <Compile Include="LatencyStats.cs" />
     <Compile Include="LogsActivity.cs" />
     <Compile Include="LogUtilities.cs" />
     <Compile Include="MainActivity.cs" />
     <Compile Include="PermissionsHelper.cs" />
     <Compile Include="PresenceBoost.cs" />
+    <Compile Include="PresetManager.cs" />
+    <Compile Include="QuickActionsPanel.cs" />
     <Compile Include="RealTimeChartView.cs" />
     <Compile Include="Resources\Resource.designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -147,6 +156,9 @@
     <Folder Include="lib\arm64-v8a\" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json">
+      <Version>13.0.3</Version>
+    </PackageReference>
     <PackageReference Include="Xamarin.AndroidX.AppCompat" Version="1.2.0.5" />
     <PackageReference Include="Xamarin.Google.Android.Material" Version="1.0.0.1" />
     <PackageReference Include="Xamarin.Essentials" Version="1.6.1" />

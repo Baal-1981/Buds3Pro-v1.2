@@ -5,7 +5,7 @@ using Android.Content;
 namespace Buds3ProAideAuditiveIA.v2
 {
     /// <summary>
-    /// Utilitaire de logs avec horodatage. Écrit à la fois dans AppLog (affichage UI)
+    /// Utilitaire de logs avec horodatage. Ã‰crit Ã  la fois dans AppLog (affichage UI)
     /// et dans un fichier texte persistant (~/Android/data/.../files/logs/sonara-YYYYMMDD.txt).
     /// </summary>
     public static class LogUtilities
